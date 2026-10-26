@@ -1,0 +1,13 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+const root=resolve(import.meta.dirname,'..');
+const folder=resolve(root,'src/ProductionFlow.Api/wwwroot');
+let html=readFileSync(resolve(folder,'index.html'),'utf8');
+const css=readFileSync(resolve(folder,'styles.css'),'utf8');
+let domain=readFileSync(resolve(folder,'domain.mjs'),'utf8').replaceAll('export const ','const ').replaceAll('export function ','function ');
+const app=readFileSync(resolve(folder,'app.mjs'),'utf8').replace(/^import\s*\{[^}]+\}\s*from\s*['"]\.\/domain\.mjs['"];?\s*/,'');
+html=html.replace(/<link rel="stylesheet" href="styles.css"\/>/,`<style>${css}</style>`);
+html=html.replace(/<script type="module" src="app.mjs"><\/script>/,`<script type="module">\n${domain}\n${app}\n</script>`);
+if(html.includes('src="app.mjs"')||html.includes('href="styles.css"'))throw Error('Standalone build failed');
+writeFileSync(resolve(root,'ProductionFlow-Demo.html'),html);
+console.log('Standalone demo built: ProductionFlow-Demo.html');
