@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ProductionFlow · Üretim Yönetimi</title>
+<meta name="description" content="Örnek üretim ve stok yönetimi sistemi: emirler, reçeteler, üretim, güvenli geri alma ve denetim izi."/>
+<link rel="stylesheet" href="styles.css"/></head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <a class="logo" href="#dashboard" aria-label="ProductionFlow ana sayfa"><span class="logo-mark">◈</span><span><strong>Production<span class="highlight">Flow</span></strong><small>OPERATIONS SUITE</small></span></a>
+    <div class="side-label">WORKSPACE</div>
+    <nav id="navigation" class="navigation" aria-label="Ana menü">
+      <button class="nav-item active" data-page="dashboard"><span class="nav-icon">▦</span> Genel bakış</button>
+      <button class="nav-item" data-page="orders"><span class="nav-icon">▤</span> Üretim emirleri</button>
+      <button class="nav-item" data-page="inventory"><span class="nav-icon">◫</span> Stok durumu</button>
+      <button class="nav-item" data-page="history"><span class="nav-icon">⟲</span> Üretim geçmişi</button>
+      <button class="nav-item" data-page="integrity"><span class="nav-icon">◇</span> Veri kalitesi</button>
+      <button class="nav-item" data-page="audit"><span class="nav-icon">≡</span> Denetim kayıtları</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-card"><div class="dot"></div><span><b>Sistem kontrolü</b><small id="systemStatus">Bağlantı kontrol ediliyor</small></span></div>
+      <div class="sidebar-footer">v0.2.0 · Açık kaynak demo<br>Gerçek şirket verisi içermez.</div>
+    </div>
+  </aside>
+  <div class="main-area">
+    <header class="topbar"><div class="crumb">WORKSPACE <span>/</span> <span id="breadcrumb">GENEL BAKIŞ</span></div><div class="top-actions"><span id="modeTag" class="mode-tag">BAĞLANIYOR</span><span class="vertical-rule"></span><span class="avatar">PF</span><span class="user">Demo Operatör</span></div></header>
+    <main class="content">
+      <div class="page-intro"><div><p class="eyebrow">ÜRETİM OPERASYONLARI</p><h1 id="pageTitle">Üretime genel bakış</h1><p id="pageDescription" class="subheading">Üretim emirlerini ve stok akışını tek merkezden takip edin.</p></div><div class="page-actions"><button id="resetDemo" class="btn btn-ghost" title="Yalnızca demo verilerini sıfırlar">↺ Demoyu sıfırla</button><button id="newProduction" class="btn btn-primary"><span>＋</span> Yeni üretim</button></div></div>
+      <section id="dashboard" class="page active" aria-label="Genel bakış"><div class="metric-grid" id="metricGrid"></div>
+        <div class="section-grid"><section class="panel"><div class="panel-head"><div><h2>Üretim emirleri</h2><p>Aktif emirlerin ilerleme durumları</p></div><button class="inline-link" data-go="orders">Tümünü gör →</button></div><div id="recentOrders" class="orders-content"></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>Son işlemler</h2><p>Üretim ve geri alma hareketleri</p></div><button class="inline-link" data-go="history">Geçmiş →</button></div><div id="recentRuns" class="recent-activity"></div></section></div>
+        <div class="info-banner"><div class="banner-icon">◎</div><div><strong>İşlem güvenliği önceliğimiz</strong><p>Geri alma işlemleri silme yerine ters stok hareketleri oluşturur. Tüm operasyonların denetim kaydı saklanır.</p></div><span class="banner-label">AUDIT READY</span></div>
+      </section>
+      <section id="orders" class="page" aria-label="Üretim emirleri"><div class="panel"><div class="table-toolbar"><div class="searchbox"><span>⌕</span><input type="search" id="searchOrders" placeholder="Emir no veya mamul ara..." autocomplete="off"/></div><select id="filterOrders" aria-label="Emir durum filtresi"><option value="all">Tüm durumlar</option><option value="Başladı">Başladı</option><option value="Üretiliyor">Üretiliyor</option><option value="Kapandı">Kapandı</option></select></div><div class="table-wrapper"><table><thead><tr><th>EMİR NO</th><th>MAMUL / STOK KODU</th><th>PLANLANAN</th><th>ÜRETİLEN</th><th>İLERLEME</th><th>DURUM</th><th></th></tr></thead><tbody id="ordersTable"></tbody></table></div></div></section>
+      <section id="inventory" class="page" aria-label="Stok durumu"><div class="panel"><div class="panel-head"><div><h2>Stok bakiyeleri</h2><p>Üretim işlemleriyle eş zamanlı güncellenir</p></div><span class="legend">● Ham madde &nbsp;&nbsp; ◌ Mamul</span></div><div class="table-wrapper"><table><thead><tr><th>STOK KODU</th><th>ÜRÜN</th><th>TÜR</th><th>MEVCUT MİKTAR</th><th>BİRİM</th></tr></thead><tbody id="inventoryTable"></tbody></table></div></div></section>
+      <section id="history" class="page" aria-label="Üretim geçmişi"><div class="panel"><div class="panel-head"><div><h2>Üretim ve geri alma geçmişi</h2><p>Her hareket için kayıt korunur, aynı işlem iki kere geri alınamaz</p></div></div><div class="table-wrapper"><table><thead><tr><th>TARİH / SAAT</th><th>EMİR</th><th>MAMUL</th><th>MİKTAR</th><th>DURUM</th><th></th></tr></thead><tbody id="runsTable"></tbody></table></div></div></section>
+      <section id="integrity" class="page" aria-label="Veri kalitesi">
+        <div class="integrity-summary" id="integritySummary"></div>
+        <div class="panel"><div class="panel-head"><div><h2>Operasyonel tutarlılık denetimi</h2><p>Emir miktarları, reçete tüketimi, stok girişleri ve ters hareketler; yalnızca okuma yapılır.</p></div><div class="integrity-actions"><button id="injectFault" class="btn btn-ghost">Örnek hata oluştur</button><button id="downloadIntegrity" class="btn btn-ghost">CSV dışa aktar</button></div></div>
+          <div class="integrity-info">Kontroller üretim kayıtlarına uygulanır. Açılış stoğu, tedarik ve sevkiyat hareketleri bu demoda bulunmadığından toplam stok mutabakatı yapılmaz. Örnek hata yalnızca yerel demo kayıtlarını değiştirir; “Demoyu sıfırla” ile kaldırılır.</div>
+          <div class="table-wrapper"><table><thead><tr><th>SEVİYE</th><th>KONTROL</th><th>REFERANS</th><th>AÇIKLAMA</th></tr></thead><tbody id="integrityTable"></tbody></table></div>
+        </div>
+      </section>
+      <section id="audit" class="page" aria-label="Denetim kayıtları"><div class="panel"><div class="panel-head"><div><h2>Denetim izi</h2><p>İşlem türü, zamanı ve açıklaması</p></div></div><div id="auditLog" class="audit-log"></div></div></section>
+    </main>
+  </div>
+</div>
+<div id="modalBackdrop" class="modal-backdrop hidden"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><p id="modalEyebrow" class="eyebrow">İŞLEM</p><h2 id="modalTitle">Yeni üretim</h2></div><button class="icon-close" id="closeModal" aria-label="Kapat">×</button></div><div id="modalBody" class="modal-body"></div><div id="modalFooter" class="modal-footer"></div></div></div>
+<div id="toast" class="toast hidden" role="status"></div>
+<script type="module" src="app.mjs"></script><script nomodule>document.body.textContent='Modern bir tarayıcı kullanın.';</script>
+
+</body></html>
