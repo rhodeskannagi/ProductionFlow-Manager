@@ -1,0 +1,20 @@
+# Never publish secrets, actual ERP data or database dumps.
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+**/bin/
+**/obj/
+node_modules/
+*.bak
+*.bacpac
+*.mdf
+*.ldf
+*.xlsx
+*.csv
+*.log
+.vs/
+.vscode/
+.DS_Store
+coverage/
+TestResults/

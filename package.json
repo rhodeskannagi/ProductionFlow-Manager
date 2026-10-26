@@ -1,0 +1,8 @@
+{
+  "name": "productionflow-manager",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test tests/*.test.mjs", "check": "node --check src/ProductionFlow.Api/wwwroot/app.mjs"},
+  "engines": {"node": ">=22"}
+}

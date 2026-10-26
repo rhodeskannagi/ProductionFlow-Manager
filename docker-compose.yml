@@ -1,0 +1,31 @@
+name: productionflow-demo
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:14333:1433'
+    volumes:
+      - productionflow_sql:/var/opt/mssql
+    healthcheck:
+      test: ['CMD-SHELL', '(/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" >/dev/null 2>&1) || exit 1']
+      interval: 15s
+      timeout: 8s
+      retries: 20
+  api:
+    build:
+      context: .
+      dockerfile: src/ProductionFlow.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: 'http://+:8080'
+      ConnectionStrings__ProductionFlow: 'Server=sqlserver,1433;Database=ProductionFlowDemo;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;'
+    ports:
+      - '127.0.0.1:5080:8080'
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+volumes:
+  productionflow_sql:
