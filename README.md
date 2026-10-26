@@ -3,7 +3,7 @@
 **Üretim emri, reçete, stok, güvenli geri alma ve veri tutarlılığı kontrolü**  
 *A portfolio-ready manufacturing operations system built with .NET 10, SQL Server, and vanilla JavaScript.*
 
-![Node tests](https://img.shields.io/badge/Node_tests-16%20passing-22a07d) ![Version](https://img.shields.io/badge/version-0.2.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
+[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.2.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
 
 > **Live interaction without a database:** Download `ProductionFlow-Demo.html` and open it in Chrome or Edge. This self-contained demo works offline on synthetic data. No company database, ERP credentials, or confidential records are included.
 
@@ -111,20 +111,16 @@ dotnet build src/ProductionFlow.Api/ProductionFlow.Api.csproj
 
 See [Architecture](docs/ARCHITECTURE.md) and [Engineering case study](docs/CASE_STUDY.md).
 
-## Publishing on GitHub
+## Repository
 
-Once a **new, empty** repository named `ProductionFlow-Manager` has been created in your GitHub account, open PowerShell **in the extracted `ProductionFlow-Manager` folder**:
+[Source and build status](https://github.com/rhodeskannagi/ProductionFlow-Manager)
 
-```powershell
-git init
-git branch -M main
-git add .
-git commit -m "feat: production workflow and integrity diagnostics"
-git remote add origin https://github.com/<YOUR-USERNAME>/ProductionFlow-Manager.git
-git push -u origin main
+```sh
+git clone https://github.com/rhodeskannagi/ProductionFlow-Manager.git
+cd ProductionFlow-Manager
 ```
 
-Replace `<YOUR-USERNAME>` with your username. Authentication via Git Credential Manager or `gh auth login` may be required. Never commit a `.env` file.
+Keep `.env` local; use `.env.example` for configuration guidance.
 
 ## Privacy & license
 
