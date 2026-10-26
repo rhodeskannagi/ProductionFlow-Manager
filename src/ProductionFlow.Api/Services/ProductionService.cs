@@ -187,7 +187,8 @@ public sealed class ProductionService(ProductionDb database)
         await using var rd=await cmd.ExecuteReaderAsync(ct);
         while(await rd.ReadAsync(ct))
         {
-            var needed=qty*rd.GetDecimal(4),available=rd.GetDecimal(5);
+            var needed = qty * rd.GetDecimal(4);
+            var available = rd.GetDecimal(5);
             items.Add(new(rd.GetInt32(0),rd.GetString(1),rd.GetString(2),rd.GetString(3),needed,available,available>=needed));
         }
         return items;
