@@ -23,3 +23,8 @@ artifacts/
 
 *.dpapi
 connection*.json
+
+# Owner signing secrets must never enter the repository or customer package
+*private*.pem
+*private*.key
+owner-secrets/

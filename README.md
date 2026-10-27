@@ -3,7 +3,7 @@
 **Üretim emri, reçete, stok, güvenli geri alma ve veri tutarlılığı kontrolü**  
 *A portfolio-ready manufacturing operations system built with .NET 10, SQL Server, and vanilla JavaScript.*
 
-[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.5.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
+[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.6.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
 
 > **Live interaction without a database:** Download `ProductionFlow-Demo.html` and open it in Chrome or Edge. This self-contained demo works offline on synthetic data. No company database, ERP credentials, or confidential records are included.
 
@@ -13,7 +13,7 @@
 
 ![Detected material-consumption mismatch](docs/integrity-preview.png)
 
-## Yeni: Windows masaüstü (v0.5.0)
+## Yeni: Windows masaüstü (v0.6.0)
 
 C# WinForms sürümü: otomatik SQL bağlantısı, boş ve bağımsız veritabanı kurulumu, Windows DPAPI ile şifreli giriş profili, ürün/stok/reçete/emir yönetimi, kalıcı çevrimdışı demo, üretim önizlemesi, gerekçeli geri alma, arama/filtreleme, stok/geçmiş ve CSV aktarımı. API ve masaüstü SQL iş mantığı `ProductionFlow.Core` içinde ortaktır.
 
@@ -135,3 +135,5 @@ Keep `.env` local; use `.env.example` for configuration guidance.
 100% fictitious dataset. No employer database, source procedure, account, hostname, customer details or private credentials. **MIT License.**
 
 Turkce sema v2, eski verilerle gecis ve onerilen genislemeler: [Uretim veri modeli](docs/URETIM_VERI_MODELI.md). Eski kayitli veritabani adi otomatik degistirilmez.
+
+**v0.6 dagitim:** Anahtarsiz ilk acilis yalniz demo; gunluk toplam 5 uretim/geri alma. Gercek SQL ve sinirsiz islemler, sahibin imzaladigi cihaza bagli cevrimdisi lisans gerektirir. [Lisanslama, limitler ve yonetici araci](docs/LISANSLAMA.md). Ozel imzalama anahtari depoda veya musteri paketinde bulunmaz.
