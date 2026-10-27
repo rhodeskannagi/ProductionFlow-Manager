@@ -16,6 +16,10 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Core behavior checks
         run: dotnet run --project tests/ProductionFlow.Core.Tests -c Release
+      - name: Offline license and quota checks
+        run: dotnet run --project tests/ProductionFlow.Licensing.Tests -c Release
+      - name: Build owner license issuer (no private key)
+        run: dotnet build src/ProductionFlow.LicenseIssuer -c Release
       - name: Start isolated SQL LocalDB
         shell: pwsh
         run: |
@@ -35,6 +39,7 @@ jobs:
           Copy-Item docs/DATABASE.md artifacts/ProductionFlow/DATABASE.md
           Copy-Item docs/URETIM_VERI_MODELI.md artifacts/ProductionFlow/URETIM_VERI_MODELI.md
           Copy-Item docs/ISIM_ESLESTIRME.json artifacts/ProductionFlow/ISIM_ESLESTIRME.json
+          Copy-Item docs/LISANSLAMA.md artifacts/ProductionFlow/LISANSLAMA.md
           Copy-Item LICENSE artifacts/ProductionFlow/LICENSE
       - uses: actions/upload-artifact@v4
         with:
