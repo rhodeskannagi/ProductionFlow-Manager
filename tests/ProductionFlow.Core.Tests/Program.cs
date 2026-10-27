@@ -29,14 +29,16 @@ try
  var detached=await reopened.Read(ct);detached.Inventory.Clear();Assert((await reopened.Read(ct)).Inventory.Count==7,"Read returns isolated snapshot");
  var corrupt=Path.Combine(root,"broken.json");File.WriteAllText(corrupt,"broken");try{_=new DemoWorkspace(corrupt);throw new Exception("Corruption silently overwritten");}catch(JsonException){Assert(File.ReadAllText(corrupt)=="broken","Corrupt persistence is not overwritten");}
  var state=JsonSerializer.Deserialize<DemoState>(File.ReadAllText(path))!;var r=state.Data.Runs.First(x=>x.ReversedAt==null);var original=state.Movements.First(x=>x.Run==r.Id&&x.Delta<0);state.Movements[state.Movements.IndexOf(original)]=original with{Delta=original.Delta-1};File.WriteAllText(path,JsonSerializer.Serialize(state));Assert((await new DemoWorkspace(path).Check(ct)).Issues.Any(i=>i.Code=="BOM_CONSUMPTION"),"Real consumption discrepancy detected");
- var owned=new ConnectionProfile{Server="localhost",Database="ProductionFlowManager",WindowsAuthentication=false,UserName="test",Password="abc;Database=master;xyz"};
- var cs=new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(owned.Build());Assert(cs.InitialCatalog=="ProductionFlowManager"&&cs.Password==owned.Password,"Connection builder escapes password delimiters");
+ var owned=new ConnectionProfile{Server="localhost",Database="UretimAkis",WindowsAuthentication=false,UserName="test",Password="abc;Database=master;xyz"};
+ var cs=new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(owned.Build());Assert(cs.InitialCatalog=="UretimAkis"&&cs.Password==owned.Password,"Connection builder escapes password delimiters");
  foreach(var invalid in new[]{"master","MegaData_Example","ProductionFlowDemo","ProductionFlow_x];DROP DATABASE master;--","ProductionFlow_"})
  {owned.Database=invalid;await Reject(()=>{owned.Validate();return Task.CompletedTask;},"Reject unowned database name: "+invalid);}
- owned.Database="ProductionFlowManager";
+ owned.Database="UretimAkis";
  var parser=new Microsoft.SqlServer.TransactSql.ScriptDom.TSql140Parser(true);
  parser.Parse(new StringReader(DatabaseBootstrap.SchemaSql),out var errors);Assert(errors.Count==0,"Owned schema parses for SQL Server 2017");
- Assert(!DatabaseBootstrap.SchemaSql.Contains("INSERT dbo.Products")&&!DatabaseBootstrap.SchemaSql.Contains("USE "),"Bootstrap schema contains no seed or database switching");
+ Assert(!DatabaseBootstrap.SchemaSql.Contains("INSERT dbo.Urunler")&&!DatabaseBootstrap.SchemaSql.Contains("USE "),"Bootstrap schema contains no seed or database switching");
+ parser.Parse(new StringReader(DatabaseBootstrap.MigrationSql),out var migrationErrors);Assert(migrationErrors.Count==0,"Turkish migration parses for SQL Server 2017");
+ Assert(DatabaseBootstrap.SchemaSql.Contains("CREATE TABLE dbo.Urunler")&&DatabaseBootstrap.SchemaSql.Contains("UrunId")&&DatabaseBootstrap.CurrentVersion==2,"Turkish physical schema version 2");
  await Reject(()=>{CatalogService.Amount(.00001m);return Task.CompletedTask;},"Reject unrepresentable stock precision");
  await Reject(()=>{CatalogService.Amount(-1,true);return Task.CompletedTask;},"Reject negative planned amount");
  await Reject(()=>{CatalogService.Text(" ",40,"Code");return Task.CompletedTask;},"Reject blank master data");

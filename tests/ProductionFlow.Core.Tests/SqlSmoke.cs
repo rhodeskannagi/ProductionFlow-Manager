@@ -14,7 +14,17 @@ internal static class SqlSmoke
   async Task Reject(Func<Task> action,string name){try{await action();}catch(DomainException){Console.WriteLine("SQL PASS "+name);return;}throw new Exception("Expected rejection: "+name);}
   try
   {
+   await using(var master=new SqlConnection(profile.Build("master")))
+   {await master.OpenAsync(ct);await using var cmd=new SqlCommand($"CREATE DATABASE [{profile.Database}]",master);await cmd.ExecuteNonQueryAsync(ct);}
+   await using(var legacy=new SqlConnection(profile.Build()))
+   {
+    await legacy.OpenAsync(ct);
+    foreach(var batch in System.Text.RegularExpressions.Regex.Split(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"LegacySchema.sql")),@"^\s*GO\s*$",System.Text.RegularExpressions.RegexOptions.Multiline))
+    {if(string.IsNullOrWhiteSpace(batch))continue;await using var cmd=new SqlCommand(batch,legacy);await cmd.ExecuteNonQueryAsync(ct);}
+    await using var seed=new SqlCommand("INSERT dbo.Products(Sku,Name,Unit,Kind) VALUES('LEGACY','Preserved','kg','material'); INSERT dbo.StockBalances(ProductId,OnHand) VALUES(SCOPE_IDENTITY(),0);",legacy);await seed.ExecuteNonQueryAsync(ct);
+   }
    await Task.WhenAll(DatabaseBootstrap.EnsureAsync(profile,ct),DatabaseBootstrap.EnsureAsync(profile,ct));
+   Require((await new CatalogService(new ProductionDb(profile.Build())).Read(ct)).Inventory.Any(x=>x.Sku=="LEGACY"),"Version 1 migration preserves existing rows");
    var db=new ProductionDb(profile.Build());var catalog=new CatalogService(db);var service=new ProductionService(db);
    Require((await service.GetOverviewAsync(ct)).Orders.Count==0,"Concurrent bootstrap leaves an empty owned schema");
    await catalog.AddProduct("MAT","Raw material","kg","material",100,"Test",ct);
@@ -33,13 +43,14 @@ internal static class SqlSmoke
    Require((await catalog.Read(ct)).Runs.Count==1,"Second startup preserves history");
    await using(var conn=await db.OpenAsync(ct))
    {
-    await ProductionDb.ExecAsync(conn,null,"UPDATE dbo.StockBalances SET OnHand=OnHand+1 WHERE ProductId=@id",ct,("@id",material));
+    await ProductionDb.ExecAsync(conn,null,"UPDATE dbo.StokBakiyeleri SET MevcutMiktar=MevcutMiktar+1 WHERE UrunId=@id",ct,("@id",material));
    }
    Require((await new IntegrityService(db).GetReportAsync(ct)).Issues.Any(i=>i.Code=="STOCK_LEDGER"),"Manual stock corruption is detected");
+   await Task.WhenAll(DatabaseBootstrap.EnsureAsync(foreign,ct),DatabaseBootstrap.EnsureAsync(foreign,ct));
+   Require((await new CatalogService(new ProductionDb(foreign.Build())).Read(ct)).Inventory.Count==0,"Concurrent fresh Turkish schema is empty");
    await using(var master=new SqlConnection(profile.Build("master")))
-   {
-    await master.OpenAsync(ct);await using var cmd=new SqlCommand($"CREATE DATABASE [{foreign.Database}]",master);await cmd.ExecuteNonQueryAsync(ct);
-   }
+   {await master.OpenAsync(ct);SqlConnection.ClearAllPools();await using var cmd=new SqlCommand($"ALTER DATABASE [{foreign.Database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{foreign.Database}]; CREATE DATABASE [{foreign.Database}];",master);await cmd.ExecuteNonQueryAsync(ct);}
+
    await using(var conn=new SqlConnection(foreign.Build()))
    {
     await conn.OpenAsync(ct);await using var cmd=new SqlCommand("CREATE TABLE dbo.KeepMe(Id INT NOT NULL); INSERT dbo.KeepMe VALUES(42);",conn);await cmd.ExecuteNonQueryAsync(ct);
