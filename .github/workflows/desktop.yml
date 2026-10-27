@@ -33,6 +33,8 @@ jobs:
         run: |
           Copy-Item docs/DESKTOP.md artifacts/ProductionFlow/KULLANIM.md
           Copy-Item docs/DATABASE.md artifacts/ProductionFlow/DATABASE.md
+          Copy-Item docs/URETIM_VERI_MODELI.md artifacts/ProductionFlow/URETIM_VERI_MODELI.md
+          Copy-Item docs/ISIM_ESLESTIRME.json artifacts/ProductionFlow/ISIM_ESLESTIRME.json
           Copy-Item LICENSE artifacts/ProductionFlow/LICENSE
       - uses: actions/upload-artifact@v4
         with:
