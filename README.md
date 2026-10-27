@@ -3,7 +3,7 @@
 **Üretim emri, reçete, stok, güvenli geri alma ve veri tutarlılığı kontrolü**  
 *A portfolio-ready manufacturing operations system built with .NET 10, SQL Server, and vanilla JavaScript.*
 
-[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.3.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
+[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.4.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
 
 > **Live interaction without a database:** Download `ProductionFlow-Demo.html` and open it in Chrome or Edge. This self-contained demo works offline on synthetic data. No company database, ERP credentials, or confidential records are included.
 
@@ -13,9 +13,9 @@
 
 ![Detected material-consumption mismatch](docs/integrity-preview.png)
 
-## Yeni: Windows masaüstü (v0.3.0)
+## Yeni: Windows masaüstü (v0.4.0)
 
-C# WinForms sürümü: kalıcı çevrimdışı demo, SQL sunucu/veritabanı seçimi, üretim önizlemesi, gerekçeli geri alma, arama/filtreleme, stok/geçmiş ve CSV aktarımı. API ve masaüstü SQL iş mantığı `ProductionFlow.Core` içinde ortaktır.
+C# WinForms sürümü: otomatik SQL bağlantısı, boş ve bağımsız veritabanı kurulumu, Windows DPAPI ile şifreli giriş profili, ürün/stok/reçete/emir yönetimi, kalıcı çevrimdışı demo, üretim önizlemesi, gerekçeli geri alma, arama/filtreleme, stok/geçmiş ve CSV aktarımı. API ve masaüstü SQL iş mantığı `ProductionFlow.Core` içinde ortaktır.
 
 **Çalıştırma ve test adımları:** [Masaüstü kılavuzu](docs/DESKTOP.md). Windows iş akışı indirilebilir EXE paketini artifact olarak üretir. Demo için SQL veya ayrı .NET kurulumu gerekmez.
 
@@ -32,6 +32,8 @@ C# WinForms sürümü: kalıcı çevrimdışı demo, SQL sunucu/veritabanı seç
 | Engineering | Repeat-safe request keys, tests, CI | Defensive coding, GitHub Actions |
 
 **Yeni v0.2.0:** *Veri kalitesi* ekranında test ortamına örnek bir reçete tüketim hatası eklemek, hatayı otomatik görmek ve CSV raporuna aktarmak mümkün. Bu işlem yalnızca **kurgu demo verilerini** etkiler. “Demoyu sıfırla” başlangıç haline döner.
+
+Bağımsız SQL kurulumu ve güvenlik ayrıntıları: [Veritabanı kılavuzu](docs/DATABASE.md).
 
 ## Quick start: no installation
 
@@ -106,7 +108,7 @@ dotnet build src/ProductionFlow.Api/ProductionFlow.Api.csproj
 
 **16 Node tests** passed in the authoring environment, covering booking, reversal, duplicate prevention, malformed inputs, order reconciliation, BOM faults, missing receipts, compensating entries, and CSV safety. The browser demo was also exercised for production → undo → integrity → CSV download.
 
-On 27 October 2026, the API and Windows desktop Release builds passed with zero warnings and errors. All 24 C# core checks and 16 existing Node tests passed. Windows GUI interaction, Docker build and live SQL integration were not executed in this environment; see the desktop acceptance checklist before operational use.
+On 27 October 2026, the API and Windows desktop Release builds passed with zero warnings and errors. All 35 platform-independent C# core checks and 16 existing Node tests passed. Windows GUI interaction, Docker build and live SQL integration were not executed in this environment; see the desktop acceptance checklist before operational use.
 
 ## Design & limitations
 

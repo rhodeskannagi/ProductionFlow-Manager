@@ -20,3 +20,6 @@ coverage/
 TestResults/
 
 artifacts/
+
+*.dpapi
+connection*.json
