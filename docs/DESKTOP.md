@@ -1,4 +1,6 @@
-# ProductionFlow Desktop 0.5.0
+> v0.6: Anahtarsiz uygulama demoyla acilir (gunluk 5 uretim/geri alma). Asagidaki SQL kurulum adimlari ancak Lisans / cihaz kodu ekranindan tam surum etkinlestirildikten sonra kullanilir. Ayrintilar: [LISANSLAMA.md](LISANSLAMA.md).
+
+# ProductionFlow Desktop 0.6.0
 
 İlk açılışta bağlantı kurulumu, sonraki açılışlarda otomatik SQL bağlantısı ve bağımsız veritabanı kurulumu için [Güncel veritabanı kılavuzu](DATABASE.md).
 
