@@ -3,7 +3,7 @@
 **Üretim emri, reçete, stok, güvenli geri alma ve veri tutarlılığı kontrolü**  
 *A portfolio-ready manufacturing operations system built with .NET 10, SQL Server, and vanilla JavaScript.*
 
-[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.4.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
+[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.5.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
 
 > **Live interaction without a database:** Download `ProductionFlow-Demo.html` and open it in Chrome or Edge. This self-contained demo works offline on synthetic data. No company database, ERP credentials, or confidential records are included.
 
@@ -13,7 +13,7 @@
 
 ![Detected material-consumption mismatch](docs/integrity-preview.png)
 
-## Yeni: Windows masaüstü (v0.4.0)
+## Yeni: Windows masaüstü (v0.5.0)
 
 C# WinForms sürümü: otomatik SQL bağlantısı, boş ve bağımsız veritabanı kurulumu, Windows DPAPI ile şifreli giriş profili, ürün/stok/reçete/emir yönetimi, kalıcı çevrimdışı demo, üretim önizlemesi, gerekçeli geri alma, arama/filtreleme, stok/geçmiş ve CSV aktarımı. API ve masaüstü SQL iş mantığı `ProductionFlow.Core` içinde ortaktır.
 
@@ -57,7 +57,7 @@ Requirements: .NET 10 SDK, SQL Server 2022 (or Docker Desktop), SSMS.
 
 1. Copy `.env.example` to `.env` and choose a **new strong demo password**.
 2. Start SQL Server: `docker compose up -d sqlserver`
-3. In SSMS, connect to `localhost,14333` (SQL login `sa`, chosen password). Run **`db/001_create_and_seed.sql`** completely. It creates a **separate** `ProductionFlowDemo` database.
+3. In SSMS, connect to `localhost,14333` (SQL login `sa`, chosen password). Run **`db/001_create_and_seed.sql`** completely. It creates a **separate** `UretimAkisDemo` database.
 4. Start API: `docker compose up --build -d api`
 5. Open <http://localhost:5080> and check the **SQL SERVER BAĞLI** indicator.
 
@@ -67,7 +67,7 @@ For development without Docker:
 
 ```powershell
 cd src/ProductionFlow.Api
-$env:ConnectionStrings__ProductionFlow="Server=localhost;Database=ProductionFlowDemo;Integrated Security=True;TrustServerCertificate=True;"
+$env:ConnectionStrings__ProductionFlow="Server=localhost;Database=UretimAkisDemo;Integrated Security=True;TrustServerCertificate=True;"
 dotnet run --urls http://localhost:5080
 ```
 
@@ -108,7 +108,7 @@ dotnet build src/ProductionFlow.Api/ProductionFlow.Api.csproj
 
 **16 Node tests** passed in the authoring environment, covering booking, reversal, duplicate prevention, malformed inputs, order reconciliation, BOM faults, missing receipts, compensating entries, and CSV safety. The browser demo was also exercised for production → undo → integrity → CSV download.
 
-On 27 October 2026, the API and Windows desktop Release builds passed with zero warnings and errors. All 35 platform-independent C# core checks and 16 existing Node tests passed. Windows GUI interaction, Docker build and live SQL integration were not executed in this environment; see the desktop acceptance checklist before operational use.
+On 27 October 2026, the API and Windows desktop Release builds passed with zero warnings and errors. All 37 platform-independent C# core checks and 16 existing Node tests passed. Windows GUI interaction, Docker build and live SQL integration were not executed in this environment; see the desktop acceptance checklist before operational use.
 
 ## Design & limitations
 
@@ -133,3 +133,5 @@ Keep `.env` local; use `.env.example` for configuration guidance.
 ## Privacy & license
 
 100% fictitious dataset. No employer database, source procedure, account, hostname, customer details or private credentials. **MIT License.**
+
+Turkce sema v2, eski verilerle gecis ve onerilen genislemeler: [Uretim veri modeli](docs/URETIM_VERI_MODELI.md). Eski kayitli veritabani adi otomatik degistirilmez.
