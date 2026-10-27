@@ -1,8 +1,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY src/ProductionFlow.Api/*.csproj src/ProductionFlow.Api/
+COPY src/ProductionFlow.Core/*.csproj src/ProductionFlow.Core/
 RUN dotnet restore src/ProductionFlow.Api/ProductionFlow.Api.csproj
 COPY src/ProductionFlow.Api/ src/ProductionFlow.Api/
+COPY src/ProductionFlow.Core/ src/ProductionFlow.Core/
 RUN dotnet publish src/ProductionFlow.Api/ProductionFlow.Api.csproj -c Release -o /out --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app

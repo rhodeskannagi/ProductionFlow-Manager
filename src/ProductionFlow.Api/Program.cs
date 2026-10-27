@@ -1,7 +1,8 @@
 using ProductionFlow.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<ProductionDb>();
+builder.Services.AddSingleton(_ => new ProductionDb(builder.Configuration.GetConnectionString("ProductionFlow")
+    ?? throw new InvalidOperationException("ProductionFlow bağlantı bilgisi eksik.")));
 builder.Services.AddSingleton<ProductionService>();
 builder.Services.AddSingleton<IntegrityService>();
 builder.Services.AddExceptionHandler<ProductionExceptionHandler>();
@@ -33,7 +34,3 @@ app.MapGet("/api/runs/{runId:guid}/undo-preview", (Guid runId, ProductionService
 app.MapPost("/api/runs/{runId:guid}/undo", (Guid runId, UndoInput body, ProductionService svc, CancellationToken ct) => svc.UndoAsync(runId, body, ct));
 
 app.Run();
-
-public record QuantityInput(decimal Quantity);
-public record ProduceInput(decimal Quantity, Guid RequestId, string? Operator);
-public record UndoInput(string? Reason, string? Operator);
