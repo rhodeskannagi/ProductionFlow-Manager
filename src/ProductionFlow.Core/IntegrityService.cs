@@ -135,7 +135,7 @@ public sealed class IntegrityService(ProductionDb database)
 
         // Owned databases record opening stock and corrections separately.
         // The old portfolio demo has no adjustment ledger and retains its narrower checks.
-        if(await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID('dbo') AND name='InventoryAdjustments'",ct)==1)
+        if(await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID('dbo') AND name='StokDuzeltmeleri'",ct)==1)
         {
             await using var cmd=ProductionDb.Command(conn,tx,"""
                 SELECT p.StokKodu,b.MevcutMiktar,COALESCE(m.Total,0)+COALESCE(a.Total,0)
