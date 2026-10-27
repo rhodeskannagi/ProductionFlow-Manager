@@ -1,8 +1,8 @@
-# Bağımsız ProductionFlow veritabanı — v0.4
+# Bağımsız ProductionFlow veritabanı — v0.5
 
 ## İlk açılış
 
-Uygulama kayıtlı bağlantı varsa otomatik bağlanır. Kayıt yoksa tek seferlik kurulum ekranı açılır. Mevcut SQL Server örneğinizi, SQL kullanıcı/parolanızı veya Windows kimlik doğrulamasını seçin. Varsayılan veritabanı **ProductionFlowManager**. İlk kurulumda hesabın veritabanı oluşturma ve şema kurma yetkisi gerekir; uygulama kendisine yetki vermez ve SQL login oluşturmaz.
+Uygulama kayıtlı bağlantı varsa otomatik bağlanır. Kayıt yoksa tek seferlik kurulum ekranı açılır. Mevcut SQL Server örneğinizi, SQL kullanıcı/parolanızı veya Windows kimlik doğrulamasını seçin. Varsayılan veritabanı **UretimAkis**. İlk kurulumda hesabın veritabanı oluşturma ve şema kurma yetkisi gerekir; uygulama kendisine yetki vermez ve SQL login oluşturmaz.
 
 **Bağlan / kur ve şifreli kaydet**:
 
@@ -14,7 +14,7 @@ Uygulama kayıtlı bağlantı varsa otomatik bağlanır. Kayıt yoksa tek seferl
 
 Normal sonraki açılışta şema oluşturma veya master üzerinde DDL gerekmez. Profildeki veritabanı silinmişse, hesap yetkili olduğu sürece yeniden boş kurulur. **Bu bir yedekten kurtarma değildir.** Erişim sorunu, sürüm uyuşmazlığı veya dolu yabancı veritabanı varsa kurulum durur; veri silinmez.
 
-Adlar `ProductionFlowManager` veya `ProductionFlow_` öneki ve harf/rakam/alt çizgi ile sınırlıdır. Bu, sistem ve ERP veritabanlarının yanlış seçilmesini engeller. `dbo.AppSchema` içindeki uygulama kimliği ve sürüm ayrıca doğrulanır. Var olan v0.3 `ProductionFlowDemo` otomatik taşınmaz. Mega'dan tablo, prosedür, trigger veya veri alınmaz. Aynı SQL örneğinde barınmak CPU/RAM/disk kaynaklarının paylaşıldığı anlamına gelir; mantıksal veritabanı ayrılığı fiziksel sunucu ayrılığı değildir.
+Adlar `UretimAkis` veya `UretimAkis_` öneki ve harf/rakam/alt çizgi ile sınırlıdır. Bu, sistem ve ERP veritabanlarının yanlış seçilmesini engeller. `dbo.UygulamaSemasi` içindeki uygulama kimliği ve sürüm ayrıca doğrulanır. Var olan v0.3 `ProductionFlowDemo` otomatik taşınmaz. Mega'dan tablo, prosedür, trigger veya veri alınmaz. Aynı SQL örneğinde barınmak CPU/RAM/disk kaynaklarının paylaşıldığı anlamına gelir; mantıksal veritabanı ayrılığı fiziksel sunucu ayrılığı değildir.
 
 ## Şifreli profil
 
@@ -44,7 +44,7 @@ Parola sohbetten istenmez, kaynak koda eklenmez ve GitHub'a gönderilmez. Bozuk/
 - Emir/geri alma sorguları için `(OrderId, ReversedAt) INCLUDE (Quantity)`.
 - Stok hareketleri için `(RunId, MovementType, ProductId) INCLUDE (Delta)`.
 - Reçete hammadde ve emir ürün foreign key indeksleri.
-- `InventoryAdjustments`: ilk stok ve gerekçeli düzeltme defteri.
+- `StokDuzeltmeleri`: ilk stok ve gerekçeli düzeltme defteri.
 - `STOCK_LEDGER`: stok bakiyesini üretim + ters hareket + ilk stok/düzeltme toplamıyla karşılaştırır.
 - Tutarlılık raporu aynı SERIALIZABLE okuma transaction'ında çalışır; eşzamanlı yazma sırasında geçici tutarsız görünümü azaltır, fakat yazmaları bekletebilir.
 - Kurulumda oturum kilidi, şemada transaction; aynı anda iki uygulama açılışı tekrarlı tablo kurmaz.
@@ -62,3 +62,7 @@ Kendi sunucunuzdaki ilk bağlantı/kurulum ve Windows ekran kabul testi ayrıca 
 - [Windows DPAPI](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata)
 - [CREATE DATABASE ve autocommit](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-database-transact-sql)
 - [SQL uygulama kilidi](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql)
+
+Turkce sema v2, eski verilerle gecis ve onerilen genislemeler: [Uretim veri modeli](URETIM_VERI_MODELI.md). Eski kayitli veritabani adi otomatik degistirilmez.
+
+v0.4 kurulumlari kendi eski veritabani adinda korunur; `ProductionFlowManager` ve `ProductionFlow_` adlari yalniz uyumluluk icin desteklenir. Semasi v1 olan sahipli veritabani, diger istemciler kapatildiktan sonra tablo/sutun adlari degistirilerek v2 yapilir. Gecis oncesi yedek alin.
