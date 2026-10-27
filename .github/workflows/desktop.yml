@@ -16,12 +16,23 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Core behavior checks
         run: dotnet run --project tests/ProductionFlow.Core.Tests -c Release
+      - name: Start isolated SQL LocalDB
+        shell: pwsh
+        run: |
+          $localDb = Get-ChildItem "$env:ProgramFiles/Microsoft SQL Server/*/Tools/Binn/SqlLocalDB.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $localDb) { throw "SQL LocalDB is required for database integration checks." }
+          $instances = & $localDb.FullName info
+          if ($instances -contains 'MSSQLLocalDB') { & $localDb.FullName start MSSQLLocalDB } else { & $localDb.FullName create MSSQLLocalDB -s }
+          if ($LASTEXITCODE -ne 0) { throw "LocalDB startup failed." }
+      - name: Bootstrap and SQL isolation checks
+        run: dotnet run --project tests/ProductionFlow.Core.Tests -c Release -- --sql-smoke
       - name: Build Windows application
         run: dotnet publish src/ProductionFlow.Desktop/ProductionFlow.Desktop.csproj -c Release -r win-x64 --self-contained true -o artifacts/ProductionFlow
       - name: Include operating instructions
         shell: pwsh
         run: |
           Copy-Item docs/DESKTOP.md artifacts/ProductionFlow/KULLANIM.md
+          Copy-Item docs/DATABASE.md artifacts/ProductionFlow/DATABASE.md
           Copy-Item LICENSE artifacts/ProductionFlow/LICENSE
       - uses: actions/upload-artifact@v4
         with:
