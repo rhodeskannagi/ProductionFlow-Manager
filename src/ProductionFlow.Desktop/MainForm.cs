@@ -15,6 +15,7 @@ public sealed class MainForm : Form
  readonly NumericUpDown quantity=new(){Minimum=1,Maximum=100000,Value=1,Width=100};
  readonly DataGridView orders=Grid(),inventory=Grid(),history=Grid(),audit=Grid(),quality=Grid();
  readonly TabControl tabs=new(){Dock=DockStyle.Fill};
+ ConnectionProfile? profile;
  readonly CancellationTokenSource lifetime=new();
  readonly Panel content=new(){Dock=DockStyle.Fill};
  bool busy;
@@ -24,23 +25,23 @@ public sealed class MainForm : Form
  string pendingActor="";
  public MainForm()
  {
-  workspace=new DemoWorkspace(demoPath);
-  Text="ProductionFlow Manager • Masaüstü 0.3";Size=new(1300,850);MinimumSize=new(1000,680);StartPosition=FormStartPosition.CenterScreen;Font=new("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
+  workspace=new DisconnectedWorkspace();
+  Text="ProductionFlow Manager • Masaüstü 0.4";Size=new(1300,850);MinimumSize=new(1000,680);StartPosition=FormStartPosition.CenterScreen;Font=new("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
   var header=new FlowLayoutPanel{Dock=DockStyle.Top,Height=64,BackColor=Color.FromArgb(21,36,56),Padding=new(14,6,0,0),WrapContents=false};
   header.Controls.Add(new Label{Text="PRODUCTIONFLOW",AutoSize=true,ForeColor=Color.White,Font=new("Segoe UI Semibold",18),Margin=new(4,8,12,0)});header.Controls.Add(mode);
-  header.Controls.Add(Button("SQL bağlantısı",Connect));header.Controls.Add(Button("Demo moduna geç",async()=>{if(MessageBox.Show(this,"SQL bağlantısından ayrılıp yerel demo verilerine geçilsin mi?","Çalışma alanı",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;workspace=new DemoWorkspace(demoPath);pendingRequest=Guid.NewGuid();SetMode("DEMO • Yerel kayıt");await RefreshData();}));header.Controls.Add(Button("Yenile",RefreshData));
+  header.Controls.Add(Button("Bağlantı ayarları",Connect));header.Controls.Add(Button("Demo moduna geç",async()=>{if(MessageBox.Show(this,"SQL bağlantısından ayrılıp yerel demo verilerine geçilsin mi?","Çalışma alanı",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;workspace=new DemoWorkspace(demoPath);pendingRequest=Guid.NewGuid();SetMode("DEMO • Yerel kayıt");await RefreshData();}));header.Controls.Add(Button("Yenile",RefreshData));
   content.Controls.Add(tabs);var metricPanel=new Panel{Dock=DockStyle.Top,Height=62};metricPanel.Controls.Add(metrics);content.Controls.Add(metricPanel);
   Controls.Add(content);Controls.Add(status);Controls.Add(header);
   var ordersPage=Page("Üretim emirleri",orders);var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=78,Padding=new(10),WrapContents=true};
   filter.Items.AddRange(["Tüm emirler","Açık emirler","Kapandı"]);filter.SelectedIndex=1;
   bar.Controls.AddRange([search,filter,new Label{Text="Miktar",AutoSize=true,Margin=new(10,7,0,0)},quantity,Button("Önizle ve üret",Produce),new Label{Text="Operatör",AutoSize=true,Margin=new(10,7,0,0)},actor]);ordersPage.Controls.Add(bar);
-  Page("Stoklar",inventory);Page("Üretim geçmişi",history).Controls.Add(TopBar(Button("Seçili üretimi geri al",Undo)));
+  Page("Stoklar",inventory);var management=new TabPage("Yönetim"){Padding=new(18)};management.Controls.Add(TopBar(Button("Ürün / ilk stok",()=>Manage("product")),Button("Stok düzelt",()=>Manage("stock")),Button("Reçete tanımla",()=>Manage("recipe")),Button("Yeni üretim emri",()=>Manage("order"))));tabs.TabPages.Add(management);Page("Üretim geçmişi",history).Controls.Add(TopBar(Button("Seçili üretimi geri al",Undo)));
   Page("İşlem günlüğü",audit);Page("Veri kalitesi",quality).Controls.Add(TopBar(Button("Kontrolleri çalıştır",Check)));
   foreach(TabPage page in tabs.TabPages)page.Controls.Add(new Panel{Dock=DockStyle.Bottom,Height=44,Controls={Button("Görünümü CSV aktar",Export)}});
   search.TextChanged+=(_,_)=>BindOrders();filter.SelectedIndexChanged+=(_,_)=>BindOrders();
-  Shown+=async(_,_)=>await Guard(RefreshData);
+  Shown+=async(_,_)=>await Guard(Startup);
   FormClosing+=(_,e)=>{if(busy){e.Cancel=true;status.Text="Devam eden işlemin bitmesini bekleyin.";}else lifetime.Cancel();};
-  FormClosed+=(_,_)=>lifetime.Dispose();SetMode("DEMO • Yerel kayıt");
+  FormClosed+=(_,_)=>lifetime.Dispose();SetMode("BAĞLANTI BEKLENİYOR");
  }
  void SetMode(string title){mode.Text=title;Text="ProductionFlow Manager • "+title;}
  static DataGridView Grid()=>new(){Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoGenerateColumns=true,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,RowHeadersVisible=false,BackgroundColor=Color.White,BorderStyle=BorderStyle.None,AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.AllCells,AlternatingRowsDefaultCellStyle=new(){BackColor=Color.FromArgb(244,247,250)},ColumnHeadersHeight=38};
@@ -54,11 +55,32 @@ public sealed class MainForm : Form
   catch(Exception e){status.Text="İşlem tamamlanamadı.";MessageBox.Show(this,e.Message+"\n\nÜretim/geri alma sırasında bağlantı kesildiyse, yeniden denemeden önce Yenile ile geçmişi kontrol edin.","İşlem sonucu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
   finally{busy=false;content.Enabled=true;UseWaitCursor=false;}
  }
+ async Task Startup()
+ {
+  try
+  {
+   profile=new ProfileStore().Load();
+   if(profile==null){await Connect();return;}
+   status.Text="Kayıtlı sunucuya bağlanılıyor…";
+   await DatabaseBootstrap.EnsureAsync(profile,lifetime.Token);
+   await OpenProfile(profile);
+  }
+  catch(Exception e)
+  {
+   SetMode("BAĞLANTI KURULAMADI");
+   MessageBox.Show(this,"Otomatik bağlantı kurulamadı. Kayıtlı ayarlar silinmedi.\n"+e.Message,"Bağlantı",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+   await Connect();
+  }
+ }
  async Task Connect()
  {
-  using var dialog=new ConnectionDialog();if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-  var candidate=new SqlWorkspace(new ProductionDb(dialog.ConnectionString!));var data=await candidate.Read(lifetime.Token);
-  workspace=candidate;snapshot=data;pendingRequest=Guid.NewGuid();SetMode("SQL • "+dialog.Caption);BindAll();quality.DataSource=null;
+  using var dialog=new ConnectionDialog(profile);if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+  profile=dialog.Profile!;await OpenProfile(profile);
+ }
+ async Task OpenProfile(ConnectionProfile selected)
+ {
+  var candidate=new SqlWorkspace(new ProductionDb(selected.Build()));var data=await candidate.Read(lifetime.Token);
+  workspace=candidate;snapshot=data;pendingRequest=Guid.NewGuid();SetMode("SQL • "+selected.Database);BindAll();quality.DataSource=null;
  }
  async Task RefreshData(){snapshot=await workspace.Read(lifetime.Token);BindAll();quality.DataSource=null;}
  void BindAll()
@@ -76,6 +98,12 @@ public sealed class MainForm : Form
   orders.DataSource=snapshot.Orders.Where(o=>(filter.SelectedIndex!=1||o.Status!="Kapandı")&&(filter.SelectedIndex!=2||o.Status=="Kapandı")&&(o.Code+" "+o.ProductName+" "+o.Sku).Contains(term,StringComparison.CurrentCultureIgnoreCase)).Select(o=>new{Id=o.Id,Emir=o.Code,StokKodu=o.Sku,Ürün=o.ProductName,Planlanan=o.Planned,Üretilen=o.Produced,Kalan=o.Planned-o.Produced,Durum=o.Status}).ToList();
   if(orders.Columns["Id"] is {} oc)oc.Visible=false;
   foreach(DataGridViewRow row in orders.Rows)if(row.Cells["Id"].Value is int rid&&rid==selected){orders.CurrentCell=row.Cells["Emir"];break;}
+ }
+ async Task Manage(string operation)
+ {
+  if(workspace is not SqlWorkspace || profile==null)throw new DomainException("Bu ekranlar bağımsız SQL veritabanında kullanılır. Önce bağlantı ayarlarını tamamlayın.");
+  using var dialog=new CatalogDialog(operation,new CatalogService(new ProductionDb(profile.Build())),actor.Text);
+  if(dialog.ShowDialog(this)==DialogResult.OK)await RefreshData();
  }
  async Task Produce()
  {
