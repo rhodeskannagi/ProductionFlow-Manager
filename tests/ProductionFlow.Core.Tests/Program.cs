@@ -29,6 +29,27 @@ try
  var detached=await reopened.Read(ct);detached.Inventory.Clear();Assert((await reopened.Read(ct)).Inventory.Count==7,"Read returns isolated snapshot");
  var corrupt=Path.Combine(root,"broken.json");File.WriteAllText(corrupt,"broken");try{_=new DemoWorkspace(corrupt);throw new Exception("Corruption silently overwritten");}catch(JsonException){Assert(File.ReadAllText(corrupt)=="broken","Corrupt persistence is not overwritten");}
  var state=JsonSerializer.Deserialize<DemoState>(File.ReadAllText(path))!;var r=state.Data.Runs.First(x=>x.ReversedAt==null);var original=state.Movements.First(x=>x.Run==r.Id&&x.Delta<0);state.Movements[state.Movements.IndexOf(original)]=original with{Delta=original.Delta-1};File.WriteAllText(path,JsonSerializer.Serialize(state));Assert((await new DemoWorkspace(path).Check(ct)).Issues.Any(i=>i.Code=="BOM_CONSUMPTION"),"Real consumption discrepancy detected");
+ var owned=new ConnectionProfile{Server="localhost",Database="ProductionFlowManager",WindowsAuthentication=false,UserName="test",Password="abc;Database=master;xyz"};
+ var cs=new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(owned.Build());Assert(cs.InitialCatalog=="ProductionFlowManager"&&cs.Password==owned.Password,"Connection builder escapes password delimiters");
+ foreach(var invalid in new[]{"master","MegaData_Example","ProductionFlowDemo","ProductionFlow_x];DROP DATABASE master;--","ProductionFlow_"})
+ {owned.Database=invalid;await Reject(()=>{owned.Validate();return Task.CompletedTask;},"Reject unowned database name: "+invalid);}
+ owned.Database="ProductionFlowManager";
+ var parser=new Microsoft.SqlServer.TransactSql.ScriptDom.TSql140Parser(true);
+ parser.Parse(new StringReader(DatabaseBootstrap.SchemaSql),out var errors);Assert(errors.Count==0,"Owned schema parses for SQL Server 2017");
+ Assert(!DatabaseBootstrap.SchemaSql.Contains("INSERT dbo.Products")&&!DatabaseBootstrap.SchemaSql.Contains("USE "),"Bootstrap schema contains no seed or database switching");
+ await Reject(()=>{CatalogService.Amount(.00001m);return Task.CompletedTask;},"Reject unrepresentable stock precision");
+ await Reject(()=>{CatalogService.Amount(-1,true);return Task.CompletedTask;},"Reject negative planned amount");
+ await Reject(()=>{CatalogService.Text(" ",40,"Code");return Task.CompletedTask;},"Reject blank master data");
+ if(OperatingSystem.IsWindows())
+ {
+  var protectedPath=Path.Combine(root,"profile.dpapi");var vault=new ProductionFlow.Desktop.ProfileStore(protectedPath);vault.Save(owned);
+  Assert(vault.Load()!.Password==owned.Password&&vault.Load()!.UserName==owned.UserName,"Windows DPAPI profile roundtrip");
+  Assert(!System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(protectedPath)).Contains(owned.Password),"No plaintext password in saved profile");
+  var bytes=File.ReadAllBytes(protectedPath);bytes[^1]^=0x7F;File.WriteAllBytes(protectedPath,bytes);
+  try{_=vault.Load();throw new Exception("Tampered ciphertext accepted");}catch(System.Security.Cryptography.CryptographicException){Assert(File.ReadAllBytes(protectedPath).SequenceEqual(bytes),"Tampered profile rejected and preserved");}
+ }
+ else Console.WriteLine("SKIP Windows DPAPI checks (requires Windows)");
+ if(args.Contains("--sql-smoke"))await SqlSmoke.Run();
  Console.WriteLine($"{passed} checks passed.");
 }
 finally{Directory.Delete(root,true);}
