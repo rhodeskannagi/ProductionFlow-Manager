@@ -3,7 +3,7 @@ namespace ProductionFlow.Desktop;
 public sealed class ConnectionDialog : Form
 {
  readonly TextBox server=new(){Width=420,PlaceholderText=@"Sunucu\SQL örneği"};
- readonly TextBox database=new(){Width=420,Text="ProductionFlowManager",MaxLength=100};
+ readonly TextBox database=new(){Width=420,Text="UretimAkis",MaxLength=100};
  readonly CheckBox windows=new(){Text="Windows kimlik doğrulaması",Checked=true,AutoSize=true};
  readonly TextBox user=new(){Width=420};
  readonly TextBox password=new(){Width=420,UseSystemPasswordChar=true};
