@@ -3,7 +3,6 @@ using Microsoft.Data.SqlClient;
 
 namespace ProductionFlow.Api.Services;
 
-public sealed class DomainException(string message) : Exception(message);
 
 public sealed class ProductionExceptionHandler(ILogger<ProductionExceptionHandler> logger) : IExceptionHandler
 {

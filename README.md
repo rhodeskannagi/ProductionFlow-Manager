@@ -1,9 +1,11 @@
 # ProductionFlow Manager
 
-**Üretim emri, reçete, stok, güvenli geri alma ve veri tutarlılığı kontrolü**  
+**English** | [Türkçe](README.tr.md)
+
+**Production orders, bills of materials, inventory, safe reversal and data-integrity checks**
 *A portfolio-ready manufacturing operations system built with .NET 10, SQL Server, and vanilla JavaScript.*
 
-[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.2.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
+[![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.6.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
 
 > **Live interaction without a database:** Download `ProductionFlow-Demo.html` and open it in Chrome or Edge. This self-contained demo works offline on synthetic data. No company database, ERP credentials, or confidential records are included.
 
@@ -13,7 +15,13 @@
 
 ![Detected material-consumption mismatch](docs/integrity-preview.png)
 
-## What this demonstrates / Ne işe yarar?
+## Windows desktop (v0.6.0)
+
+The C# WinForms application provides automatic SQL connection, creation of an empty independently owned database, a Windows DPAPI-encrypted connection profile, product/inventory/BOM/order management, a persistent offline demo, production previews, reasoned reversals, search/filtering, inventory/history views and CSV export. SQL business logic is shared by the API and desktop through `ProductionFlow.Core`.
+
+**Setup and acceptance checks:** [Desktop guide (Turkish)](docs/DESKTOP.md). The Windows workflow produces a downloadable executable artifact. The desktop demo requires neither SQL Server nor a separate .NET installation.
+
+## What this demonstrates
 
 | Module | Features | Skills demonstrated |
 |---|---|---|
@@ -25,7 +33,9 @@
 | Demo UI | Responsive, standalone, local state | HTML, CSS, JavaScript |
 | Engineering | Repeat-safe request keys, tests, CI | Defensive coding, GitHub Actions |
 
-**Yeni v0.2.0:** *Veri kalitesi* ekranında test ortamına örnek bir reçete tüketim hatası eklemek, hatayı otomatik görmek ve CSV raporuna aktarmak mümkün. Bu işlem yalnızca **kurgu demo verilerini** etkiler. “Demoyu sıfırla” başlangıç haline döner.
+The browser demo's **Veri kalitesi** (Data quality) screen can inject a sample BOM consumption mismatch, detect it and export a CSV report. This changes only **synthetic demo data**. **Demoyu sıfırla** restores the initial state.
+
+Independent SQL setup and security details: [Database guide (Turkish)](docs/DATABASE.md).
 
 ## Quick start: no installation
 
@@ -49,7 +59,7 @@ Requirements: .NET 10 SDK, SQL Server 2022 (or Docker Desktop), SSMS.
 
 1. Copy `.env.example` to `.env` and choose a **new strong demo password**.
 2. Start SQL Server: `docker compose up -d sqlserver`
-3. In SSMS, connect to `localhost,14333` (SQL login `sa`, chosen password). Run **`db/001_create_and_seed.sql`** completely. It creates a **separate** `ProductionFlowDemo` database.
+3. In SSMS, connect to `localhost,14333` (SQL login `sa`, chosen password). Run **`db/001_create_and_seed.sql`** completely. It creates a **separate** `UretimAkisDemo` database.
 4. Start API: `docker compose up --build -d api`
 5. Open <http://localhost:5080> and check the **SQL SERVER BAĞLI** indicator.
 
@@ -59,7 +69,7 @@ For development without Docker:
 
 ```powershell
 cd src/ProductionFlow.Api
-$env:ConnectionStrings__ProductionFlow="Server=localhost;Database=ProductionFlowDemo;Integrated Security=True;TrustServerCertificate=True;"
+$env:ConnectionStrings__ProductionFlow="Server=localhost;Database=UretimAkisDemo;Integrated Security=True;TrustServerCertificate=True;"
 dotnet run --urls http://localhost:5080
 ```
 
@@ -100,7 +110,7 @@ dotnet build src/ProductionFlow.Api/ProductionFlow.Api.csproj
 
 **16 Node tests** passed in the authoring environment, covering booking, reversal, duplicate prevention, malformed inputs, order reconciliation, BOM faults, missing receipts, compensating entries, and CSV safety. The browser demo was also exercised for production → undo → integrity → CSV download.
 
-`.NET` SDK and a live SQL Server instance were unavailable in that environment. The **.NET build and SQL integration have not been verified here**. GitHub Actions runs the .NET build after a repository is published; run a connected SQL integration test before any operational use.
+For v0.6, Windows CI passed **40 core checks, 36 licensing/quota/DPAPI checks and 12 SQL LocalDB scenarios**, and built both Windows applications. These automated checks do not replace interactive Windows GUI acceptance testing. Docker deployment was not tested in the authoring environment.
 
 ## Design & limitations
 
@@ -125,3 +135,11 @@ Keep `.env` local; use `.env.example` for configuration guidance.
 ## Privacy & license
 
 100% fictitious dataset. No employer database, source procedure, account, hostname, customer details or private credentials. **MIT License.**
+
+Turkish ASCII schema v2, migration of existing records and proposed extensions: [Manufacturing data model (Turkish)](docs/URETIM_VERI_MODELI.md). Previously saved database names are not automatically renamed.
+
+## Offline desktop licensing (v0.6)
+
+Without a license, the desktop starts in demo mode with **five production/reversal operations per Windows user per day**, resetting at midnight Turkey time. Real SQL access and unlimited operations require a device-bound offline license signed by the owner. See [Licensing, limits and owner tool (Turkish)](docs/LISANSLAMA.md). The private signing key is never included in the repository or customer package.
+
+Offline enforcement can be bypassed by modifying local state, the clock or the application. There is no central revocation. Earlier binaries, the separate web/API demo and the public MIT source are not restricted by this feature.

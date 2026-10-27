@@ -21,7 +21,7 @@ services:
       dockerfile: src/ProductionFlow.Api/Dockerfile
     environment:
       ASPNETCORE_URLS: 'http://+:8080'
-      ConnectionStrings__ProductionFlow: 'Server=sqlserver,1433;Database=ProductionFlowDemo;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;'
+      ConnectionStrings__ProductionFlow: 'Server=sqlserver,1433;Database=UretimAkisDemo;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;'
     ports:
       - '127.0.0.1:5080:8080'
     depends_on:

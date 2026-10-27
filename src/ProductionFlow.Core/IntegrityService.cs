@@ -15,6 +15,7 @@ public sealed class IntegrityService(ProductionDb database)
     public async Task<IntegrityReport> GetReportAsync(CancellationToken ct)
     {
         await using var conn = await database.OpenAsync(ct);
+        await using var tx=(SqlTransaction)await conn.BeginTransactionAsync(System.Data.IsolationLevel.Serializable,ct);
         var problems = new List<IntegrityIssue>();
         var orders = 0;
         var runs = 0;
@@ -23,12 +24,12 @@ public sealed class IntegrityService(ProductionDb database)
             problems.Add(new IntegrityIssue(severity, code, reference, details));
 
         // Every order is compared with its active, non-reversed production runs.
-        await using (var cmd = ProductionDb.Command(conn, null, """
-            SELECT o.Code,o.Planned,o.Produced,o.Status,
-                   COALESCE(SUM(CASE WHEN r.ReversedAt IS NULL THEN r.Quantity ELSE 0 END),0)
-            FROM dbo.Orders o LEFT JOIN dbo.ProductionRuns r ON r.OrderId=o.OrderId
-            GROUP BY o.OrderId,o.Code,o.Planned,o.Produced,o.Status
-            ORDER BY o.OrderId;
+        await using (var cmd = ProductionDb.Command(conn, tx, """
+            SELECT o.Kod,o.PlanlananMiktar,o.UretilenMiktar,o.Durum,
+                   COALESCE(SUM(CASE WHEN r.GeriAlmaZamani IS NULL THEN r.Miktar ELSE 0 END),0)
+            FROM dbo.UretimEmirleri o LEFT JOIN dbo.UretimKayitlari r ON r.EmirId=o.EmirId
+            GROUP BY o.EmirId,o.Kod,o.PlanlananMiktar,o.UretilenMiktar,o.Durum
+            ORDER BY o.EmirId;
             """))
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
             while (await reader.ReadAsync(ct))
@@ -46,22 +47,22 @@ public sealed class IntegrityService(ProductionDb database)
                     $"Beklenen durum {expectedStatus}, kayıtlı {status}.");
             }
 
-        await using (var cmd = ProductionDb.Command(conn, null, """
-            SELECT p.Sku,b.OnHand FROM dbo.StockBalances b
-            JOIN dbo.Products p ON p.ProductId=b.ProductId WHERE b.OnHand < 0;
+        await using (var cmd = ProductionDb.Command(conn, tx, """
+            SELECT p.StokKodu,b.MevcutMiktar FROM dbo.StokBakiyeleri b
+            JOIN dbo.Urunler p ON p.UrunId=b.UrunId WHERE b.MevcutMiktar < 0;
             """))
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
             while (await reader.ReadAsync(ct))
                 Add("error", "INVALID_STOCK", reader.GetString(0), "Stok bakiyesi negatif veya geçersiz.");
 
         // A production run must have exactly one finished-goods receipt of its quantity.
-        await using (var cmd = ProductionDb.Command(conn, null, """
-            SELECT r.RunId,r.Quantity,
-                   COALESCE(SUM(CASE WHEN m.MovementType='P' AND m.ProductId=o.ProductId THEN m.Delta ELSE 0 END),0),
-                   COALESCE(SUM(CASE WHEN m.MovementType='P' AND m.ProductId=o.ProductId THEN 1 ELSE 0 END),0)
-            FROM dbo.ProductionRuns r JOIN dbo.Orders o ON o.OrderId=r.OrderId
-            LEFT JOIN dbo.StockMovements m ON m.RunId=r.RunId
-            GROUP BY r.RunId,r.Quantity,o.ProductId;
+        await using (var cmd = ProductionDb.Command(conn, tx, """
+            SELECT r.UretimId,r.Miktar,
+                   COALESCE(SUM(CASE WHEN m.HareketTuru='P' AND m.UrunId=o.UrunId THEN m.MiktarDegisimi ELSE 0 END),0),
+                   COALESCE(SUM(CASE WHEN m.HareketTuru='P' AND m.UrunId=o.UrunId THEN 1 ELSE 0 END),0)
+            FROM dbo.UretimKayitlari r JOIN dbo.UretimEmirleri o ON o.EmirId=r.EmirId
+            LEFT JOIN dbo.StokHareketleri m ON m.UretimId=r.UretimId
+            GROUP BY r.UretimId,r.Miktar,o.UrunId;
             """))
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
             while (await reader.ReadAsync(ct))
@@ -76,14 +77,14 @@ public sealed class IntegrityService(ProductionDb database)
             }
 
         // Actual raw-material consumption is checked against the BOM for each run.
-        await using (var cmd = ProductionDb.Command(conn, null, """
-            SELECT r.RunId,p.Sku,r.Quantity*rec.PerUnit,
-                   -COALESCE(SUM(CASE WHEN m.MovementType='C' THEN m.Delta ELSE 0 END),0)
-            FROM dbo.ProductionRuns r JOIN dbo.Orders o ON o.OrderId=r.OrderId
-            JOIN dbo.Recipes rec ON rec.ProductId=o.ProductId
-            JOIN dbo.Products p ON p.ProductId=rec.MaterialId
-            LEFT JOIN dbo.StockMovements m ON m.RunId=r.RunId AND m.ProductId=rec.MaterialId
-            GROUP BY r.RunId,p.Sku,r.Quantity,rec.PerUnit;
+        await using (var cmd = ProductionDb.Command(conn, tx, """
+            SELECT r.UretimId,p.StokKodu,r.Miktar*rec.BirimTuketim,
+                   -COALESCE(SUM(CASE WHEN m.HareketTuru='C' THEN m.MiktarDegisimi ELSE 0 END),0)
+            FROM dbo.UretimKayitlari r JOIN dbo.UretimEmirleri o ON o.EmirId=r.EmirId
+            JOIN dbo.ReceteKalemleri rec ON rec.UrunId=o.UrunId
+            JOIN dbo.Urunler p ON p.UrunId=rec.MalzemeId
+            LEFT JOIN dbo.StokHareketleri m ON m.UretimId=r.UretimId AND m.UrunId=rec.MalzemeId
+            GROUP BY r.UretimId,p.StokKodu,r.Miktar,rec.BirimTuketim;
             """))
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
             while (await reader.ReadAsync(ct))
@@ -98,14 +99,14 @@ public sealed class IntegrityService(ProductionDb database)
 
         // For a reversed run, every product's compensating delta must cancel its
         // original delta; active runs must not contain compensating movements.
-        await using (var cmd = ProductionDb.Command(conn, null, """
-            SELECT r.RunId,p.Sku,r.ReversedAt,
-                   SUM(CASE WHEN m.MovementType IN ('P','C') THEN m.Delta ELSE 0 END),
-                   SUM(CASE WHEN m.MovementType='U' THEN m.Delta ELSE 0 END)
-            FROM dbo.StockMovements m
-            JOIN dbo.ProductionRuns r ON r.RunId=m.RunId
-            JOIN dbo.Products p ON p.ProductId=m.ProductId
-            GROUP BY r.RunId,p.Sku,r.ReversedAt;
+        await using (var cmd = ProductionDb.Command(conn, tx, """
+            SELECT r.UretimId,p.StokKodu,r.GeriAlmaZamani,
+                   SUM(CASE WHEN m.HareketTuru IN ('P','C') THEN m.MiktarDegisimi ELSE 0 END),
+                   SUM(CASE WHEN m.HareketTuru='U' THEN m.MiktarDegisimi ELSE 0 END)
+            FROM dbo.StokHareketleri m
+            JOIN dbo.UretimKayitlari r ON r.UretimId=m.UretimId
+            JOIN dbo.Urunler p ON p.UrunId=m.UrunId
+            GROUP BY r.UretimId,p.StokKodu,r.GeriAlmaZamani;
             """))
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
             while (await reader.ReadAsync(ct))
@@ -121,17 +122,33 @@ public sealed class IntegrityService(ProductionDb database)
             }
 
         // A low finished-goods balance is a workflow warning, not accounting corruption.
-        await using (var cmd = ProductionDb.Command(conn, null, """
-            SELECT r.RunId,b.OnHand,r.Quantity FROM dbo.ProductionRuns r
-            JOIN dbo.Orders o ON o.OrderId=r.OrderId
-            JOIN dbo.StockBalances b ON b.ProductId=o.ProductId
-            WHERE r.ReversedAt IS NULL AND b.OnHand < r.Quantity;
+        await using (var cmd = ProductionDb.Command(conn, tx, """
+            SELECT r.UretimId,b.MevcutMiktar,r.Miktar FROM dbo.UretimKayitlari r
+            JOIN dbo.UretimEmirleri o ON o.EmirId=r.EmirId
+            JOIN dbo.StokBakiyeleri b ON b.UrunId=o.UrunId
+            WHERE r.GeriAlmaZamani IS NULL AND b.MevcutMiktar < r.Miktar;
             """))
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
             while (await reader.ReadAsync(ct))
                 Add("warning", "UNDO_BLOCKED", reader.GetGuid(0).ToString(),
                     $"Mevcut mamul stoğu {reader.GetDecimal(1)}; geri almak için {reader.GetDecimal(2)} gerekli.");
 
+        // Owned databases record opening stock and corrections separately.
+        // The old portfolio demo has no adjustment ledger and retains its narrower checks.
+        if(await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID('dbo') AND name='StokDuzeltmeleri'",ct)==1)
+        {
+            await using var cmd=ProductionDb.Command(conn,tx,"""
+                SELECT p.StokKodu,b.MevcutMiktar,COALESCE(m.Total,0)+COALESCE(a.Total,0)
+                FROM dbo.StokBakiyeleri b JOIN dbo.Urunler p ON p.UrunId=b.UrunId
+                LEFT JOIN (SELECT UrunId,SUM(MiktarDegisimi) AS Total FROM dbo.StokHareketleri GROUP BY UrunId) m ON m.UrunId=b.UrunId
+                LEFT JOIN (SELECT UrunId,SUM(MiktarDegisimi) AS Total FROM dbo.StokDuzeltmeleri GROUP BY UrunId) a ON a.UrunId=b.UrunId
+                WHERE b.MevcutMiktar<>COALESCE(m.Total,0)+COALESCE(a.Total,0);
+                """);
+            await using var reader=await cmd.ExecuteReaderAsync(ct);
+            while(await reader.ReadAsync(ct)) Add("error","STOCK_LEDGER",reader.GetString(0),$"Bakiye {reader.GetDecimal(1)}, hareket toplamı {reader.GetDecimal(2)}.");
+        }
+
+        await tx.CommitAsync(ct);
         var sorted = problems.OrderBy(p => p.Severity).ThenBy(p => p.Code).ThenBy(p => p.Reference).ToList();
         return new IntegrityReport(DateTime.UtcNow, orders, runs, sorted,
             sorted.Count(p => p.Severity == "error"), sorted.Count(p => p.Severity == "warning"));

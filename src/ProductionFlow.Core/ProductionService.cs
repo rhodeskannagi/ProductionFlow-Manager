@@ -16,39 +16,35 @@ internal sealed record LedgerRow(int ProductId,decimal Delta);
 
 public sealed class ProductionService(ProductionDb database)
 {
-    public async Task<object> GetOverviewAsync(CancellationToken ct)
+    public async Task<Overview> GetOverviewAsync(CancellationToken ct)
     {
         await using var conn = await database.OpenAsync(ct);
         var orders=new List<OrderView>(); var inventory=new List<ProductView>();var runs=new List<RunView>();var audit=new List<AuditView>();
         await using(var cmd=ProductionDb.Command(conn,null,"""
-          SELECT o.OrderId,o.Code,o.ProductId,p.Name,p.Sku,o.Planned,o.Produced,o.Status,o.CreatedAt
-          FROM dbo.Orders o JOIN dbo.Products p ON p.ProductId=o.ProductId ORDER BY o.OrderId;
+          SELECT o.EmirId,o.Kod,o.UrunId,p.Ad,p.StokKodu,o.PlanlananMiktar,o.UretilenMiktar,o.Durum,o.OlusturmaZamani
+          FROM dbo.UretimEmirleri o JOIN dbo.Urunler p ON p.UrunId=o.UrunId ORDER BY o.EmirId;
           """))
         await using(var reader=await cmd.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct)) orders.Add(new(reader.GetInt32(0),reader.GetString(1),reader.GetInt32(2),reader.GetString(3),reader.GetString(4),reader.GetDecimal(5),reader.GetDecimal(6),reader.GetString(7),Utc(reader.GetDateTime(8))));
         await using(var cmd=ProductionDb.Command(conn,null,"""
-          SELECT p.ProductId,p.Sku,p.Name,p.Unit,p.Kind,b.OnHand
-          FROM dbo.Products p JOIN dbo.StockBalances b ON p.ProductId=b.ProductId ORDER BY p.ProductId;
+          SELECT p.UrunId,p.StokKodu,p.Ad,p.Birim,p.Tur,b.MevcutMiktar
+          FROM dbo.Urunler p JOIN dbo.StokBakiyeleri b ON p.UrunId=b.UrunId ORDER BY p.UrunId;
           """))
         await using(var reader=await cmd.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct)) inventory.Add(new(reader.GetInt32(0),reader.GetString(1),reader.GetString(2),reader.GetString(3),reader.GetString(4),reader.GetDecimal(5)));
         await using(var cmd=ProductionDb.Command(conn,null,"""
-          SELECT r.RunId,r.RequestId,r.OrderId,o.Code,p.Name,r.Quantity,r.CreatedAt,r.ReversedAt,r.Reason,r.Operator
-          FROM dbo.ProductionRuns r JOIN dbo.Orders o ON o.OrderId=r.OrderId JOIN dbo.Products p ON p.ProductId=o.ProductId
-          ORDER BY r.CreatedAt DESC,r.RunId DESC;
+          SELECT r.UretimId,r.IstekId,r.EmirId,o.Kod,p.Ad,r.Miktar,r.OlusturmaZamani,r.GeriAlmaZamani,r.Gerekce,r.Operator
+          FROM dbo.UretimKayitlari r JOIN dbo.UretimEmirleri o ON o.EmirId=r.EmirId JOIN dbo.Urunler p ON p.UrunId=o.UrunId
+          ORDER BY r.OlusturmaZamani DESC,r.UretimId DESC;
           """))
         await using(var reader=await cmd.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct)) runs.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetInt32(2),reader.GetString(3),reader.GetString(4),reader.GetDecimal(5),Utc(reader.GetDateTime(6)),reader.IsDBNull(7)?null:Utc(reader.GetDateTime(7)),reader.IsDBNull(8)?null:reader.GetString(8),reader.GetString(9)));
         await using(var cmd=ProductionDb.Command(conn,null,"""
-          SELECT TOP (150) AuditId,OccurredAt,Action,Details FROM dbo.AuditEvents ORDER BY AuditId DESC;
+          SELECT TOP (150) GunlukId,IslemZamani,Islem,Aciklama FROM dbo.IslemGunlugu ORDER BY GunlukId DESC;
           """))
         await using(var reader=await cmd.ExecuteReaderAsync(ct))
             while(await reader.ReadAsync(ct)) audit.Add(new(reader.GetInt64(0),Utc(reader.GetDateTime(1)),reader.GetString(2),reader.GetString(3)));
-        return new
-        {
-            orders,inventory,runs,audit,
-            stats=new {orders=orders.Count,active=orders.Count(o=>o.Status!="Kapandı"),completed=orders.Count(o=>o.Status=="Kapandı"),produced=orders.Sum(o=>o.Produced),reversedRuns=runs.Count(r=>r.ReversedAt!=null)}
-        };
+        return new Overview(orders,inventory,runs,audit);
     }
 
     public async Task<ProductionPreview> PreviewProductionAsync(int orderId,decimal quantity,CancellationToken ct)
@@ -68,7 +64,7 @@ public sealed class ProductionService(ProductionDb database)
         await using var tx=(SqlTransaction)await conn.BeginTransactionAsync(IsolationLevel.Serializable,ct);
         try
         {
-            var existing=await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT COUNT(1) FROM dbo.ProductionRuns WITH (UPDLOCK,HOLDLOCK) WHERE RequestId=@id",ct,("@id",input.RequestId));
+            var existing=await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT COUNT(1) FROM dbo.UretimKayitlari WITH (UPDLOCK,HOLDLOCK) WHERE IstekId=@id",ct,("@id",input.RequestId));
             if(existing!=0) throw new DomainException("Bu üretim isteği daha önce işlendi.");
             var order=await GetOrderAsync(conn,tx,orderId,true,ct) ?? throw new DomainException("Üretim emri bulunamadı.");
             var materials=await GetMaterialsAsync(conn,tx,order.ProductId,input.Quantity,true,ct);
@@ -76,7 +72,7 @@ public sealed class ProductionService(ProductionDb database)
             if(!preview.CanProduce) throw new DomainException(string.Join(" ",preview.Warnings));
             var runId=Guid.NewGuid();
             await ProductionDb.ExecAsync(conn,tx,"""
-                INSERT dbo.ProductionRuns(RunId,RequestId,OrderId,Quantity,Operator)
+                INSERT dbo.UretimKayitlari(UretimId,IstekId,EmirId,Miktar,Operator)
                 VALUES(@run,@request,@order,@qty,@actor)
                 """,ct,("@run",runId),("@request",input.RequestId),("@order",orderId),("@qty",input.Quantity),("@actor",actor));
             foreach(var m in materials.OrderBy(x=>x.ProductId))
@@ -87,8 +83,8 @@ public sealed class ProductionService(ProductionDb database)
             await UpdateStockAsync(conn,tx,order.ProductId,input.Quantity,ct);
             await AddMovementAsync(conn,tx,runId,order.ProductId,input.Quantity,'P',ct);
             var next=order.Produced+input.Quantity;
-            await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.Orders SET Produced=@qty,Status=@status WHERE OrderId=@id",ct,("@qty",next),("@status",GetStatus(next,order.Planned)),("@id",order.Id));
-            await ProductionDb.ExecAsync(conn,tx,"INSERT dbo.AuditEvents(Actor,Action,RunId,Details) VALUES(@actor,N'PRODUCE',@run,@info)",ct,("@actor",actor),("@run",runId),("@info",$"{order.Code} · {input.Quantity} adet üretildi"));
+            await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.UretimEmirleri SET UretilenMiktar=@qty,Durum=@status WHERE EmirId=@id",ct,("@qty",next),("@status",GetStatus(next,order.Planned)),("@id",order.Id));
+            await ProductionDb.ExecAsync(conn,tx,"INSERT dbo.IslemGunlugu(Kullanici,Islem,UretimId,Aciklama) VALUES(@actor,N'PRODUCE',@run,@info)",ct,("@actor",actor),("@run",runId),("@info",$"{order.Code} · {input.Quantity} adet üretildi"));
             await tx.CommitAsync(ct);
             return new {id=runId,orderCode=order.Code,quantity=input.Quantity,produced=next,status=GetStatus(next,order.Planned)};
         }
@@ -111,7 +107,7 @@ public sealed class ProductionService(ProductionDb database)
         try
         {
             // Lock order before run to preserve consistent lock acquisition against production.
-            var orderId=await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT OrderId FROM dbo.ProductionRuns WHERE RunId=@id",ct,("@id",runId));
+            var orderId=await ProductionDb.ScalarAsync<int>(conn,tx,"SELECT EmirId FROM dbo.UretimKayitlari WHERE UretimId=@id",ct,("@id",runId));
             if(orderId==0) throw new DomainException("Üretim kaydı bulunamadı.");
             _=await GetOrderAsync(conn,tx,orderId,true,ct)??throw new DomainException("Üretim emri bulunamadı.");
             var run=await GetRunAsync(conn,tx,runId,true,ct)??throw new DomainException("Üretim kaydı bulunamadı.");
@@ -132,9 +128,9 @@ public sealed class ProductionService(ProductionDb database)
                 await AddMovementAsync(conn,tx,runId,m.ProductId,-m.Delta,'U',ct);
             }
             var next=run.Produced-run.Quantity;
-            await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.Orders SET Produced=@qty,Status=@status WHERE OrderId=@id",ct,("@qty",next),("@status",GetStatus(next,run.Planned)),("@id",run.OrderId));
-            await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.ProductionRuns SET ReversedAt=SYSUTCDATETIME(),Reason=@reason,ReversedBy=@actor WHERE RunId=@id AND ReversedAt IS NULL",ct,("@reason",reason),("@actor",actor),("@id",run.Id));
-            await ProductionDb.ExecAsync(conn,tx,"INSERT dbo.AuditEvents(Actor,Action,RunId,Details) VALUES(@actor,N'UNDO',@id,@details)",ct,("@actor",actor),("@id",run.Id),("@details",$"{run.OrderCode} · {run.Quantity} adet geri alındı · {reason}"));
+            await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.UretimEmirleri SET UretilenMiktar=@qty,Durum=@status WHERE EmirId=@id",ct,("@qty",next),("@status",GetStatus(next,run.Planned)),("@id",run.OrderId));
+            await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.UretimKayitlari SET GeriAlmaZamani=SYSUTCDATETIME(),Gerekce=@reason,GeriAlan=@actor WHERE UretimId=@id AND GeriAlmaZamani IS NULL",ct,("@reason",reason),("@actor",actor),("@id",run.Id));
+            await ProductionDb.ExecAsync(conn,tx,"INSERT dbo.IslemGunlugu(Kullanici,Islem,UretimId,Aciklama) VALUES(@actor,N'UNDO',@id,@details)",ct,("@actor",actor),("@id",run.Id),("@details",$"{run.OrderCode} · {run.Quantity} adet geri alındı · {reason}"));
             await tx.CommitAsync(ct);
             return new {runId,orderCode=run.OrderCode,reversedQuantity=run.Quantity,produced=next,status=GetStatus(next,run.Planned)};
         }
@@ -169,7 +165,7 @@ public sealed class ProductionService(ProductionDb database)
     }
     private static async Task<OrderRow?> GetOrderAsync(SqlConnection conn,SqlTransaction? tx,int id,bool locked,CancellationToken ct)
     {
-        var sql=$"SELECT OrderId,Code,ProductId,Planned,Produced FROM dbo.Orders {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")} WHERE OrderId=@id";
+        var sql=$"SELECT EmirId,Kod,UrunId,PlanlananMiktar,UretilenMiktar FROM dbo.UretimEmirleri {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")} WHERE EmirId=@id";
         await using var cmd=ProductionDb.Command(conn,tx,sql,("@id",id));
         await using var rd=await cmd.ExecuteReaderAsync(ct);
         return await rd.ReadAsync(ct)?new(rd.GetInt32(0),rd.GetString(1),rd.GetInt32(2),rd.GetDecimal(3),rd.GetDecimal(4)):null;
@@ -177,10 +173,10 @@ public sealed class ProductionService(ProductionDb database)
     private static async Task<List<MaterialView>> GetMaterialsAsync(SqlConnection conn,SqlTransaction? tx,int productId,decimal qty,bool locked,CancellationToken ct)
     {
         var sql=$"""
-            SELECT r.MaterialId,p.Sku,p.Name,p.Unit,r.PerUnit,b.OnHand
-            FROM dbo.Recipes r JOIN dbo.Products p ON p.ProductId=r.MaterialId
-            JOIN dbo.StockBalances b {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")} ON b.ProductId=r.MaterialId
-            WHERE r.ProductId=@id ORDER BY r.MaterialId
+            SELECT r.MalzemeId,p.StokKodu,p.Ad,p.Birim,r.BirimTuketim,b.MevcutMiktar
+            FROM dbo.ReceteKalemleri r JOIN dbo.Urunler p ON p.UrunId=r.MalzemeId
+            JOIN dbo.StokBakiyeleri b {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")} ON b.UrunId=r.MalzemeId
+            WHERE r.UrunId=@id ORDER BY r.MalzemeId
             """;
         var items=new List<MaterialView>();
         await using var cmd=ProductionDb.Command(conn,tx,sql,("@id",productId));
@@ -196,9 +192,9 @@ public sealed class ProductionService(ProductionDb database)
     private static async Task<OriginalRun?> GetRunAsync(SqlConnection conn,SqlTransaction? tx,Guid id,bool locked,CancellationToken ct)
     {
         var sql=$"""
-            SELECT r.RunId,r.OrderId,r.Quantity,r.ReversedAt,o.Code,o.ProductId,o.Produced,o.Planned
-            FROM dbo.ProductionRuns r {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")}
-            JOIN dbo.Orders o ON o.OrderId=r.OrderId WHERE r.RunId=@id
+            SELECT r.UretimId,r.EmirId,r.Miktar,r.GeriAlmaZamani,o.Kod,o.UrunId,o.UretilenMiktar,o.PlanlananMiktar
+            FROM dbo.UretimKayitlari r {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")}
+            JOIN dbo.UretimEmirleri o ON o.EmirId=r.EmirId WHERE r.UretimId=@id
             """;
         await using var cmd=ProductionDb.Command(conn,tx,sql,("@id",id));
         await using var rd=await cmd.ExecuteReaderAsync(ct);
@@ -206,7 +202,7 @@ public sealed class ProductionService(ProductionDb database)
     }
     private static async Task<decimal> GetStockAsync(SqlConnection conn,SqlTransaction? tx,int id,bool locked,CancellationToken ct)
     {
-        var sql=$"SELECT OnHand FROM dbo.StockBalances {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")} WHERE ProductId=@id";
+        var sql=$"SELECT MevcutMiktar FROM dbo.StokBakiyeleri {(locked?"WITH (UPDLOCK,HOLDLOCK)":"")} WHERE UrunId=@id";
         await using var cmd=ProductionDb.Command(conn,tx,sql,("@id",id));
         var value=await cmd.ExecuteScalarAsync(ct);
         if(value is not decimal qty) throw new DomainException("Stok bakiyesi kaydı bulunamadı.");
@@ -216,8 +212,8 @@ public sealed class ProductionService(ProductionDb database)
     {
         var result=new List<LedgerRow>();
         await using var cmd=ProductionDb.Command(conn,tx,"""
-            SELECT ProductId,SUM(Delta) FROM dbo.StockMovements WITH (HOLDLOCK)
-            WHERE RunId=@id AND MovementType IN ('P','C') GROUP BY ProductId ORDER BY ProductId
+            SELECT UrunId,SUM(MiktarDegisimi) FROM dbo.StokHareketleri WITH (HOLDLOCK)
+            WHERE UretimId=@id AND HareketTuru IN ('P','C') GROUP BY UrunId ORDER BY UrunId
             """,("@id",id));
         await using var reader=await cmd.ExecuteReaderAsync(ct);
         while(await reader.ReadAsync(ct)) result.Add(new(reader.GetInt32(0),reader.GetDecimal(1)));
@@ -225,11 +221,11 @@ public sealed class ProductionService(ProductionDb database)
     }
     private static async Task UpdateStockAsync(SqlConnection conn,SqlTransaction tx,int id,decimal delta,CancellationToken ct)
     {
-        if(await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.StockBalances SET OnHand=OnHand+@delta WHERE ProductId=@id AND OnHand+@delta>=0",ct,("@delta",delta),("@id",id))!=1)
+        if(await ProductionDb.ExecAsync(conn,tx,"UPDATE dbo.StokBakiyeleri SET MevcutMiktar=MevcutMiktar+@delta WHERE UrunId=@id AND MevcutMiktar+@delta>=0",ct,("@delta",delta),("@id",id))!=1)
             throw new DomainException("Stok bakiyesi yetersiz veya kayıt eksik.");
     }
     private static async Task AddMovementAsync(SqlConnection conn,SqlTransaction tx,Guid runId,int productId,decimal delta,char type,CancellationToken ct)
     {
-        await ProductionDb.ExecAsync(conn,tx,"INSERT dbo.StockMovements(RunId,ProductId,Delta,MovementType) VALUES(@run,@product,@delta,@type)",ct,("@run",runId),("@product",productId),("@delta",delta),("@type",type.ToString()));
+        await ProductionDb.ExecAsync(conn,tx,"INSERT dbo.StokHareketleri(UretimId,UrunId,MiktarDegisimi,HareketTuru) VALUES(@run,@product,@delta,@type)",ct,("@run",runId),("@product",productId),("@delta",delta),("@type",type.ToString()));
     }
 }

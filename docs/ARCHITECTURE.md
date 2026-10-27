@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
   UI[Responsive web UI] --> API[.NET 10 Minimal API]
-  API --> DB[(SQL Server 2022<br/>ProductionFlowDemo)]
+  API --> DB[(SQL Server 2022<br/>UretimAkisDemo)]
   API --> R[Read-only integrity checks]
   UI -->|API unreachable| D[Offline synthetic state]
   D --> C[Domain validation + integrity checks]

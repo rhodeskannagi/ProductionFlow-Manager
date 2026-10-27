@@ -3,10 +3,9 @@ using System.Data;
 
 namespace ProductionFlow.Api.Services;
 
-public sealed class ProductionDb(IConfiguration configuration)
+public sealed class ProductionDb(string connectionString)
 {
-    private readonly string _connectionString = configuration.GetConnectionString("ProductionFlow")
-        ?? throw new InvalidOperationException("ConnectionStrings__ProductionFlow ortam değişkenini tanımlayın.");
+    private readonly string _connectionString = connectionString;
 
     public async Task<SqlConnection> OpenAsync(CancellationToken ct)
     {

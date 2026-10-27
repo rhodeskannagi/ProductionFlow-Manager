@@ -1,0 +1,48 @@
+name: Windows desktop
+on:
+  push:
+    branches: [main, 'feature/desktop-*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Core behavior checks
+        run: dotnet run --project tests/ProductionFlow.Core.Tests -c Release
+      - name: Offline license and quota checks
+        run: dotnet run --project tests/ProductionFlow.Licensing.Tests -c Release
+      - name: Build owner license issuer (no private key)
+        run: dotnet build src/ProductionFlow.LicenseIssuer -c Release
+      - name: Start isolated SQL LocalDB
+        shell: pwsh
+        run: |
+          $localDb = Get-ChildItem "$env:ProgramFiles/Microsoft SQL Server/*/Tools/Binn/SqlLocalDB.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $localDb) { throw "SQL LocalDB is required for database integration checks." }
+          $instances = & $localDb.FullName info
+          if ($instances -contains 'MSSQLLocalDB') { & $localDb.FullName start MSSQLLocalDB } else { & $localDb.FullName create MSSQLLocalDB -s }
+          if ($LASTEXITCODE -ne 0) { throw "LocalDB startup failed." }
+      - name: Bootstrap and SQL isolation checks
+        run: dotnet run --project tests/ProductionFlow.Core.Tests -c Release -- --sql-smoke
+      - name: Build Windows application
+        run: dotnet publish src/ProductionFlow.Desktop/ProductionFlow.Desktop.csproj -c Release -r win-x64 --self-contained true -o artifacts/ProductionFlow
+      - name: Include operating instructions
+        shell: pwsh
+        run: |
+          Copy-Item docs/DESKTOP.md artifacts/ProductionFlow/KULLANIM.md
+          Copy-Item docs/DATABASE.md artifacts/ProductionFlow/DATABASE.md
+          Copy-Item docs/URETIM_VERI_MODELI.md artifacts/ProductionFlow/URETIM_VERI_MODELI.md
+          Copy-Item docs/ISIM_ESLESTIRME.json artifacts/ProductionFlow/ISIM_ESLESTIRME.json
+          Copy-Item docs/LISANSLAMA.md artifacts/ProductionFlow/LISANSLAMA.md
+          Copy-Item LICENSE artifacts/ProductionFlow/LICENSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ProductionFlow-Desktop-win-x64
+          path: artifacts/ProductionFlow/
+          if-no-files-found: error
