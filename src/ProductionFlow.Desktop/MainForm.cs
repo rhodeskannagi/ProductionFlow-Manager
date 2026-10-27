@@ -1,4 +1,5 @@
 using System.Text;
+using ProductionFlow.Licensing;
 using ProductionFlow.Api.Services;
 namespace ProductionFlow.Desktop;
 public sealed class MainForm : Form
@@ -16,6 +17,9 @@ public sealed class MainForm : Form
  readonly DataGridView orders=Grid(),inventory=Grid(),history=Grid(),audit=Grid(),quality=Grid();
  readonly TabControl tabs=new(){Dock=DockStyle.Fill};
  ConnectionProfile? profile;
+ UsagePolicy? licensing;
+ UsagePolicy Licensing=>licensing??=new UsagePolicy(new LicenseStore(),LicenseStore.DeviceCode());
+ readonly Label licenseLabel=new(){AutoSize=true,ForeColor=Color.White,Margin=new(10,14,8,0)};
  readonly CancellationTokenSource lifetime=new();
  readonly Panel content=new(){Dock=DockStyle.Fill};
  bool busy;
@@ -26,10 +30,10 @@ public sealed class MainForm : Form
  public MainForm()
  {
   workspace=new DisconnectedWorkspace();
-  Text="ProductionFlow Manager • Masaüstü 0.4";Size=new(1300,850);MinimumSize=new(1000,680);StartPosition=FormStartPosition.CenterScreen;Font=new("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
-  var header=new FlowLayoutPanel{Dock=DockStyle.Top,Height=64,BackColor=Color.FromArgb(21,36,56),Padding=new(14,6,0,0),WrapContents=false};
+  Text="ProductionFlow Manager • Masaüstü 0.6";Size=new(1300,850);MinimumSize=new(1000,680);StartPosition=FormStartPosition.CenterScreen;Font=new("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
+  var header=new FlowLayoutPanel{Dock=DockStyle.Top,Height=112,BackColor=Color.FromArgb(21,36,56),Padding=new(14,6,0,0),WrapContents=true};
   header.Controls.Add(new Label{Text="PRODUCTIONFLOW",AutoSize=true,ForeColor=Color.White,Font=new("Segoe UI Semibold",18),Margin=new(4,8,12,0)});header.Controls.Add(mode);
-  header.Controls.Add(Button("Bağlantı ayarları",Connect));header.Controls.Add(Button("Demo moduna geç",async()=>{if(MessageBox.Show(this,"SQL bağlantısından ayrılıp yerel demo verilerine geçilsin mi?","Çalışma alanı",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;workspace=new DemoWorkspace(demoPath);pendingRequest=Guid.NewGuid();SetMode("DEMO • Yerel kayıt");await RefreshData();}));header.Controls.Add(Button("Yenile",RefreshData));
+  header.Controls.Add(Button("Bağlantı ayarları",Connect));header.Controls.Add(Button("Demo moduna geç",OpenDemo));header.Controls.Add(Button("Lisans / cihaz kodu",ActivateLicense));header.Controls.Add(licenseLabel);header.Controls.Add(Button("Yenile",RefreshData));
   content.Controls.Add(tabs);var metricPanel=new Panel{Dock=DockStyle.Top,Height=62};metricPanel.Controls.Add(metrics);content.Controls.Add(metricPanel);
   Controls.Add(content);Controls.Add(status);Controls.Add(header);
   var ordersPage=Page("Üretim emirleri",orders);var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=78,Padding=new(10),WrapContents=true};
@@ -55,8 +59,19 @@ public sealed class MainForm : Form
   catch(Exception e){status.Text="İşlem tamamlanamadı.";MessageBox.Show(this,e.Message+"\n\nÜretim/geri alma sırasında bağlantı kesildiyse, yeniden denemeden önce Yenile ile geçmişi kontrol edin.","İşlem sonucu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
   finally{busy=false;content.Enabled=true;UseWaitCursor=false;}
  }
+ async Task OpenDemo()
+ {
+  workspace=new DemoWorkspace(demoPath);pendingRequest=Guid.NewGuid();SetMode("DEMO • Örnek veriler");await RefreshData();
+ }
+ async Task ActivateLicense()
+ {
+  using var dialog=new LicenseDialog(Licensing);
+  if(dialog.ShowDialog(this)==DialogResult.OK)await Startup();
+ }
+ void RequireWorkspaceLicense(){if(workspace is SqlWorkspace)Licensing.RequireFull();}
  async Task Startup()
  {
+  if(!Licensing.Status().Full){await OpenDemo();return;}
   try
   {
    profile=new ProfileStore().Load();
@@ -74,18 +89,20 @@ public sealed class MainForm : Form
  }
  async Task Connect()
  {
-  using var dialog=new ConnectionDialog(profile);if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+  Licensing.RequireFull();
+  using var dialog=new ConnectionDialog(Licensing.RequireFull,profile);if(dialog.ShowDialog(this)!=DialogResult.OK)return;
   profile=dialog.Profile!;await OpenProfile(profile);
  }
  async Task OpenProfile(ConnectionProfile selected)
  {
+  Licensing.RequireFull();
   var candidate=new SqlWorkspace(new ProductionDb(selected.Build()));var data=await candidate.Read(lifetime.Token);
   workspace=candidate;snapshot=data;pendingRequest=Guid.NewGuid();SetMode("SQL • "+selected.Database);BindAll();quality.DataSource=null;
  }
- async Task RefreshData(){snapshot=await workspace.Read(lifetime.Token);BindAll();quality.DataSource=null;}
+ async Task RefreshData(){RequireWorkspaceLicense();snapshot=await workspace.Read(lifetime.Token);BindAll();quality.DataSource=null;}
  void BindAll()
  {
-  if(snapshot==null)return;BindOrders();
+  if(snapshot==null)return;var entitlement=Licensing.Status();licenseLabel.Text=entitlement.Full?"TAM SÜRÜM":"DEMO • Bugün kalan: "+entitlement.Remaining+" / 5";BindOrders();
   inventory.DataSource=snapshot.Inventory.Select(p=>new{Kod=p.Sku,Ürün=p.Name,Birim=p.Unit,Tür=p.Kind=="finished"?"Mamul":"Hammadde",Stok=p.OnHand}).ToList();
   history.DataSource=snapshot.Runs.Select(r=>new{Id=r.Id,Emir=r.OrderCode,Ürün=r.ProductName,Miktar=r.Quantity,Tarih=r.CreatedAt.ToLocalTime(),Durum=r.ReversedAt==null?"Aktif":"Geri alındı",GeriAlma=r.ReversedAt?.ToLocalTime(),Operatör=r.Operator,Gerekçe=r.Reason}).ToList();if(history.Columns[nameof(RunView.Id)] is {} hc)hc.Visible=false;
   audit.DataSource=snapshot.Audit.Select(a=>new{Tarih=a.At.ToLocalTime(),İşlem=a.Action,Açıklama=a.Details}).ToList();
@@ -101,12 +118,14 @@ public sealed class MainForm : Form
  }
  async Task Manage(string operation)
  {
+  Licensing.RequireFull();
   if(workspace is not SqlWorkspace || profile==null)throw new DomainException("Bu ekranlar bağımsız SQL veritabanında kullanılır. Önce bağlantı ayarlarını tamamlayın.");
-  using var dialog=new CatalogDialog(operation,new CatalogService(new ProductionDb(profile.Build())),actor.Text);
+  using var dialog=new CatalogDialog(operation,new CatalogService(new ProductionDb(profile.Build())),actor.Text,Licensing.RequireFull);
   if(dialog.ShowDialog(this)==DialogResult.OK)await RefreshData();
  }
  async Task Produce()
  {
+  RequireWorkspaceLicense();
   if(orders.CurrentRow?.Cells["Id"].Value is not int id)throw new DomainException("Bir üretim emri seçin.");var q=quantity.Value;var who=actor.Text.Trim();if(who.Length==0)throw new DomainException("Operatör adı gerekli.");
   var preview=await workspace.Preview(id,q,lifetime.Token);
   var rows=preview.Materials.Select(m=>new{Kod=m.Sku,Malzeme=m.Name,Birim=m.Unit,Gerekli=m.Needed,Mevcut=m.Available,Durum=m.Enough?"Yeterli":"Yetersiz"}).ToList();
@@ -117,11 +136,13 @@ public sealed class MainForm : Form
   var ok=new Button{Text="Üretimi kaydet",AutoSize=true,Enabled=preview.CanProduce,DialogResult=DialogResult.OK};footer.Controls.Add(ok);form.Controls.Add(footer);
   if(form.ShowDialog(this)!=DialogResult.OK)return;
   if(id!=pendingOrder||q!=pendingQuantity||who!=pendingActor){pendingRequest=Guid.NewGuid();pendingOrder=id;pendingQuantity=q;pendingActor=who;}
-  await workspace.Produce(id,new(q,pendingRequest,who),lifetime.Token);pendingRequest=Guid.NewGuid();
+  if(workspace is SqlWorkspace){Licensing.RequireFull();await workspace.Produce(id,new(q,pendingRequest,who),lifetime.Token);}
+  else await Licensing.DemoWrite(()=>workspace.Produce(id,new(q,pendingRequest,who),lifetime.Token));pendingRequest=Guid.NewGuid();
   await RefreshData();status.Text=$"{preview.OrderCode}: {q:N0} adet üretim kaydedildi.";
  }
  async Task Undo()
  {
+  RequireWorkspaceLicense();
   if(history.CurrentRow?.Cells["Id"].Value is not Guid id)throw new DomainException("Geçmişten bir üretim seçin.");
   var p=await workspace.UndoPreview(id,lifetime.Token);if(!p.CanUndo)throw new DomainException(string.Join(" ",p.Warnings));
   using var dialog=new Form{Text="Üretimi geri al",Size=new(540,270),StartPosition=FormStartPosition.CenterParent,Font=Font};
@@ -130,15 +151,18 @@ public sealed class MainForm : Form
   var reason=new TextBox{Multiline=true,Width=470,Height=70,MaxLength=300,PlaceholderText="Gerekçe (8-300 karakter)"};panel.Controls.Add(reason);
   panel.Controls.Add(new Button{Text="Geri almayı onayla",AutoSize=true,DialogResult=DialogResult.OK});
   if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-  await workspace.Undo(id,new(reason.Text,actor.Text),lifetime.Token);await RefreshData();status.Text=$"{p.OrderCode}: {p.Quantity:N0} adet geri alındı.";
+  if(workspace is SqlWorkspace){Licensing.RequireFull();await workspace.Undo(id,new(reason.Text,actor.Text),lifetime.Token);}
+  else await Licensing.DemoWrite(()=>workspace.Undo(id,new(reason.Text,actor.Text),lifetime.Token));await RefreshData();status.Text=$"{p.OrderCode}: {p.Quantity:N0} adet geri alındı.";
  }
  async Task Check()
  {
+  RequireWorkspaceLicense();
   var report=await workspace.Check(lifetime.Token);quality.DataSource=report.Issues.Select(i=>new{Önem=i.Severity=="error"?"Hata":"Uyarı",Kod=i.Code,Referans=i.Reference,Açıklama=i.Details}).ToList();
   status.Text=$"Kontrol: {report.CheckedOrders} emir / {report.CheckedRuns} üretim • {report.Errors} hata, {report.Warnings} uyarı • {report.CheckedAt.ToLocalTime():HH:mm:ss}";
  }
  Task Export()
  {
+  RequireWorkspaceLicense();
   var grid=tabs.SelectedTab?.Controls.OfType<DataGridView>().SingleOrDefault();if(grid==null||grid.Rows.Count==0)throw new DomainException("Aktarılacak satır yok.");
   using var save=new SaveFileDialog{Filter="CSV dosyası|*.csv",FileName=$"ProductionFlow-{DateTime.Now:yyyyMMdd-HHmmss}.csv"};if(save.ShowDialog(this)!=DialogResult.OK)return Task.CompletedTask;
   var columns=grid.Columns.Cast<DataGridViewColumn>().Where(c=>c.Visible).OrderBy(c=>c.DisplayIndex).ToList();

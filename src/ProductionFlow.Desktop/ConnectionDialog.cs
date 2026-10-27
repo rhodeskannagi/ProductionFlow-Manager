@@ -11,7 +11,7 @@ public sealed class ConnectionDialog : Form
  readonly Label message=new(){AutoSize=false,Width=460,Height=80};
  bool running;
  public ConnectionProfile? Profile {get;private set;}
- public ConnectionDialog(ConnectionProfile? previous=null)
+ public ConnectionDialog(Action requireLicense,ConnectionProfile? previous=null)
  {
   Text="ProductionFlow • İlk kurulum / bağlantı ayarları";Size=new(540,610);FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;StartPosition=FormStartPosition.CenterParent;Font=new("Segoe UI",10);
   var panel=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,Padding=new(18),WrapContents=false,AutoScroll=true};Controls.Add(panel);
@@ -28,6 +28,7 @@ public sealed class ConnectionDialog : Form
    if(running)return;running=true;panel.Enabled=false;UseWaitCursor=true;message.Text="Bağlanılıyor; gerekiyorsa bağımsız veritabanı kuruluyor…";
    try
    {
+    requireLicense();
     var profile=new ConnectionProfile{Server=server.Text.Trim(),Database=database.Text.Trim(),WindowsAuthentication=windows.Checked,UserName=windows.Checked?"":user.Text.Trim(),Password=windows.Checked?"":password.Text,TrustServerCertificate=trust.Checked};
     await DatabaseBootstrap.EnsureAsync(profile,CancellationToken.None);
     _=await new ProductionService(new ProductionDb(profile.Build())).GetOverviewAsync(CancellationToken.None);

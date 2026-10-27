@@ -8,7 +8,7 @@ public sealed class CatalogDialog : Form
  readonly NumericUpDown amount=new(){Width=200,Minimum=-100000000,Maximum=100000000,DecimalPlaces=4};
  readonly Label message=new(){Width=450,Height=75};
  bool busy;
- public CatalogDialog(string operation,CatalogService service,string actor)
+ public CatalogDialog(string operation,CatalogService service,string actor,Action requireLicense)
  {
   Text="ProductionFlow • "+operation;Size=new(510,580);StartPosition=FormStartPosition.CenterParent;Font=new("Segoe UI",10);Controls.Add(panel);
   void Field(string label,Control control){panel.Controls.Add(new Label{Text=label,AutoSize=true});panel.Controls.Add(control);}
@@ -22,12 +22,14 @@ public sealed class CatalogDialog : Form
   var save=new Button{Text="Kaydet",AutoSize=true};panel.Controls.Add(save);panel.Controls.Add(message);
   Shown+=async(_,_)=>await Run(async()=>
   {
+   requireLicense();
    var view=await service.Read(CancellationToken.None);
    product.DisplayMember="Label";product.ValueMember="Id";product.DataSource=view.Inventory.Where(p=>operation=="stock"||p.Kind=="finished").Select(p=>new Choice(p.Id,p.Sku+" • "+p.Name)).ToList();
    material.DisplayMember="Label";material.ValueMember="Id";material.DataSource=view.Inventory.Where(p=>p.Kind=="material").Select(p=>new Choice(p.Id,p.Sku+" • "+p.Name)).ToList();
   });
   save.Click+=async(_,_)=>await Run(async()=>
   {
+   requireLicense();
    int Id(ComboBox box)=>box.SelectedValue is int id?id:throw new DomainException("Önce ürün tanımlayıp seçim yapın.");
    switch(operation)
    {
