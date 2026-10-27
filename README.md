@@ -1,6 +1,8 @@
 # ProductionFlow Manager
 
-**Üretim emri, reçete, stok, güvenli geri alma ve veri tutarlılığı kontrolü**  
+**English** | [Türkçe](README.tr.md)
+
+**Production orders, bills of materials, inventory, safe reversal and data-integrity checks**
 *A portfolio-ready manufacturing operations system built with .NET 10, SQL Server, and vanilla JavaScript.*
 
 [![CI](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/rhodeskannagi/ProductionFlow-Manager/actions/workflows/ci.yml) ![Version](https://img.shields.io/badge/version-0.6.0-40577c) ![Database](https://img.shields.io/badge/database-SQL%20Server%202022-8f67c8) ![License](https://img.shields.io/badge/license-MIT-4b7396)
@@ -13,13 +15,13 @@
 
 ![Detected material-consumption mismatch](docs/integrity-preview.png)
 
-## Yeni: Windows masaüstü (v0.6.0)
+## Windows desktop (v0.6.0)
 
-C# WinForms sürümü: otomatik SQL bağlantısı, boş ve bağımsız veritabanı kurulumu, Windows DPAPI ile şifreli giriş profili, ürün/stok/reçete/emir yönetimi, kalıcı çevrimdışı demo, üretim önizlemesi, gerekçeli geri alma, arama/filtreleme, stok/geçmiş ve CSV aktarımı. API ve masaüstü SQL iş mantığı `ProductionFlow.Core` içinde ortaktır.
+The C# WinForms application provides automatic SQL connection, creation of an empty independently owned database, a Windows DPAPI-encrypted connection profile, product/inventory/BOM/order management, a persistent offline demo, production previews, reasoned reversals, search/filtering, inventory/history views and CSV export. SQL business logic is shared by the API and desktop through `ProductionFlow.Core`.
 
-**Çalıştırma ve test adımları:** [Masaüstü kılavuzu](docs/DESKTOP.md). Windows iş akışı indirilebilir EXE paketini artifact olarak üretir. Demo için SQL veya ayrı .NET kurulumu gerekmez.
+**Setup and acceptance checks:** [Desktop guide (Turkish)](docs/DESKTOP.md). The Windows workflow produces a downloadable executable artifact. The desktop demo requires neither SQL Server nor a separate .NET installation.
 
-## What this demonstrates / Ne işe yarar?
+## What this demonstrates
 
 | Module | Features | Skills demonstrated |
 |---|---|---|
@@ -31,9 +33,9 @@ C# WinForms sürümü: otomatik SQL bağlantısı, boş ve bağımsız veritaban
 | Demo UI | Responsive, standalone, local state | HTML, CSS, JavaScript |
 | Engineering | Repeat-safe request keys, tests, CI | Defensive coding, GitHub Actions |
 
-**Yeni v0.2.0:** *Veri kalitesi* ekranında test ortamına örnek bir reçete tüketim hatası eklemek, hatayı otomatik görmek ve CSV raporuna aktarmak mümkün. Bu işlem yalnızca **kurgu demo verilerini** etkiler. “Demoyu sıfırla” başlangıç haline döner.
+The browser demo's **Veri kalitesi** (Data quality) screen can inject a sample BOM consumption mismatch, detect it and export a CSV report. This changes only **synthetic demo data**. **Demoyu sıfırla** restores the initial state.
 
-Bağımsız SQL kurulumu ve güvenlik ayrıntıları: [Veritabanı kılavuzu](docs/DATABASE.md).
+Independent SQL setup and security details: [Database guide (Turkish)](docs/DATABASE.md).
 
 ## Quick start: no installation
 
@@ -108,7 +110,7 @@ dotnet build src/ProductionFlow.Api/ProductionFlow.Api.csproj
 
 **16 Node tests** passed in the authoring environment, covering booking, reversal, duplicate prevention, malformed inputs, order reconciliation, BOM faults, missing receipts, compensating entries, and CSV safety. The browser demo was also exercised for production → undo → integrity → CSV download.
 
-On 27 October 2026, the API and Windows desktop Release builds passed with zero warnings and errors. All 37 platform-independent C# core checks and 16 existing Node tests passed. Windows GUI interaction, Docker build and live SQL integration were not executed in this environment; see the desktop acceptance checklist before operational use.
+For v0.6, Windows CI passed **40 core checks, 36 licensing/quota/DPAPI checks and 12 SQL LocalDB scenarios**, and built both Windows applications. These automated checks do not replace interactive Windows GUI acceptance testing. Docker deployment was not tested in the authoring environment.
 
 ## Design & limitations
 
@@ -134,6 +136,10 @@ Keep `.env` local; use `.env.example` for configuration guidance.
 
 100% fictitious dataset. No employer database, source procedure, account, hostname, customer details or private credentials. **MIT License.**
 
-Turkce sema v2, eski verilerle gecis ve onerilen genislemeler: [Uretim veri modeli](docs/URETIM_VERI_MODELI.md). Eski kayitli veritabani adi otomatik degistirilmez.
+Turkish ASCII schema v2, migration of existing records and proposed extensions: [Manufacturing data model (Turkish)](docs/URETIM_VERI_MODELI.md). Previously saved database names are not automatically renamed.
 
-**v0.6 dagitim:** Anahtarsiz ilk acilis yalniz demo; gunluk toplam 5 uretim/geri alma. Gercek SQL ve sinirsiz islemler, sahibin imzaladigi cihaza bagli cevrimdisi lisans gerektirir. [Lisanslama, limitler ve yonetici araci](docs/LISANSLAMA.md). Ozel imzalama anahtari depoda veya musteri paketinde bulunmaz.
+## Offline desktop licensing (v0.6)
+
+Without a license, the desktop starts in demo mode with **five production/reversal operations per Windows user per day**, resetting at midnight Turkey time. Real SQL access and unlimited operations require a device-bound offline license signed by the owner. See [Licensing, limits and owner tool (Turkish)](docs/LISANSLAMA.md). The private signing key is never included in the repository or customer package.
+
+Offline enforcement can be bypassed by modifying local state, the clock or the application. There is no central revocation. Earlier binaries, the separate web/API demo and the public MIT source are not restricted by this feature.
