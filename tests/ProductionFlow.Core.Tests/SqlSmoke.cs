@@ -26,6 +26,13 @@ internal static class SqlSmoke
    await Task.WhenAll(DatabaseBootstrap.EnsureAsync(profile,ct),DatabaseBootstrap.EnsureAsync(profile,ct));
    Require((await new CatalogService(new ProductionDb(profile.Build())).Read(ct)).Inventory.Any(x=>x.Sku=="LEGACY"),"Version 1 migration preserves existing rows");
    var db=new ProductionDb(profile.Build());var catalog=new CatalogService(db);var service=new ProductionService(db);
+   await using(var migrated=await db.OpenAsync(ct))
+   {
+    bool blocked=false;
+    try{await ProductionDb.ExecAsync(migrated,null,"UPDATE dbo.StokBakiyeleri SET MevcutMiktar=-1",ct);}catch(SqlException ex) when(ex.Number==547){blocked=true;}
+    Require(blocked,"Migrated check constraints still reject negative stock");
+   }
+
    Require((await service.GetOverviewAsync(ct)).Orders.Count==0,"Concurrent bootstrap leaves an empty owned schema");
    await catalog.AddProduct("MAT","Raw material","kg","material",100,"Test",ct);
    await catalog.AddProduct("FIN","Finished product","adet","finished",0,"Test",ct);
