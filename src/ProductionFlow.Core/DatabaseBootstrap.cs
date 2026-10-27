@@ -40,10 +40,12 @@ public static class DatabaseBootstrap
  public static async Task EnsureAsync(ConnectionProfile profile,CancellationToken ct)
  {
   profile.Validate();
+  // Initial missing-database failures must not poison the application connection pool.
+  var target=new SqlConnectionStringBuilder(profile.Build()){Pooling=false}.ConnectionString;
   // The normal path needs no master DDL privilege and performs no schema writes.
   try
   {
-   await using var current=new SqlConnection(profile.Build());await current.OpenAsync(ct);
+   await using var current=new SqlConnection(target);await current.OpenAsync(ct);
    if(await IsOwnedAsync(current,ct))return;
   }
   catch(SqlException ex) when(ex.Number==4060){ /* Missing OR inaccessible: master check below distinguishes these. */ }
@@ -66,7 +68,7 @@ public static class DatabaseBootstrap
    await using var cmd=new SqlCommand($"CREATE DATABASE [{profile.Database}]",master){CommandTimeout=90};
    await cmd.ExecuteNonQueryAsync(ct);
   }
-  await using var conn=new SqlConnection(profile.Build());await conn.OpenAsync(ct);
+  await using var conn=new SqlConnection(target);await conn.OpenAsync(ct);
   if(await IsOwnedAsync(conn,ct))return;
   // Never adopt/alter another application's nonempty database.
   await using(var check=new SqlCommand("SELECT COUNT(*) FROM sys.objects WHERE is_ms_shipped=0",conn))
